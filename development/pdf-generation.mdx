@@ -1,0 +1,441 @@
+---
+title: PDF generation
+description: Generating invoices, certificates, and reports with Dompdf
+---
+
+The Roxas Water Billing System uses Dompdf to generate PDF documents from HTML templates, including QR codes for payment verification.
+
+## Dompdf integration
+
+### Installation
+
+Dompdf is installed via Composer in each portal:
+
+```json composer.json
+{
+  "require": {
+    "dompdf/dompdf": "^2.0"
+  }
+}
+```
+
+### PHP extensions required
+
+Dompdf requires specific PHP extensions:
+
+<Warning>
+Ensure `mbstring` and `gd` extensions are enabled in php.ini:
+
+```ini
+extension=mbstring
+extension=gd
+```
+
+Without these, PDF generation will fail.
+</Warning>
+
+## PdfGenerator class
+
+The system uses a `PdfGenerator` class that extends `BaseQuery`:
+
+```php database_queries.php
+use Dompdf\Dompdf;
+use Dompdf\Options;
+
+class PdfGenerator extends BaseQuery
+{
+    public function generateRegCertificate($clientID, $applicationFeeID)
+    {
+        // Query data
+        $applicationFeeData = $this->queryApplicationFees($applicationFeeID);
+        $clientData = $this->getClientData($clientID);
+        
+        // Configure Dompdf
+        $options = new Options();
+        $options->setChroot(__DIR__);
+        $options->setIsRemoteEnabled(true);
+        $options->set('defaultFont', 'Helvetica');
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('margin-top', '0mm');
+        $options->set('margin-right', '0mm');
+        $options->set('margin-bottom', '0mm');
+        $options->set('margin-left', '0mm');
+        
+        $dompdf = new Dompdf($options);
+        $dompdf->setPaper("A4", "portrait");
+        
+        // Load and process template
+        $html = file_get_contents("./templates/reg-template.html");
+        $html = $this->replaceTemplatePlaceholders($html, $clientData, $applicationFeeData);
+        
+        // Render PDF
+        $dompdf->loadHtml($html);
+        $dompdf->render();
+        $dompdf->addInfo("Title", "Registration Certificate");
+        
+        // Save to file
+        $outputDirectory = 'temp/registration/';
+        if (!is_dir($outputDirectory)) {
+            mkdir($outputDirectory, 0755, true);
+        }
+        
+        $filename = $clientData['reg_id'] . '.pdf';
+        $filepath = $outputDirectory . $filename;
+        
+        if (file_put_contents($filepath, $dompdf->output())) {
+            return [
+                'status' => 'success',
+                'filename' => $filename,
+                'filepath' => $filepath
+            ];
+        }
+        
+        return ['status' => 'error', 'message' => 'Failed to save PDF'];
+    }
+    
+    private function replaceTemplatePlaceholders($html, $clientData, $feeData)
+    {
+        return str_replace(
+            [
+                "{{ name }}",
+                "{{ address }}",
+                "{{ meter_number }}",
+                "{{ reg_id }}",
+                "{{ client_id }}",
+                "{{ date }}",
+                "{{ property_type }}",
+                "{{ total_application_fee }}"
+            ],
+            [
+                $clientData['full_name'],
+                $clientData['full_address'],
+                $clientData['meter_number'],
+                $clientData['reg_id'],
+                $clientData['client_id'],
+                $clientData['timestamp'],
+                $clientData['property_type'],
+                number_format($feeData['total'], 2, '.', ',')
+            ],
+            $html
+        );
+    }
+}
+```
+
+## HTML templates
+
+PDF templates are HTML files with placeholder variables:
+
+### Registration certificate template
+
+```html templates/reg-template.html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Helvetica', sans-serif;
+            margin: 0;
+            padding: 20mm;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .content {
+            line-height: 1.6;
+        }
+        .signature {
+            margin-top: 50px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Certificate of Registration</h1>
+        <p>Roxas Water District</p>
+    </div>
+    
+    <div class="content">
+        <p>This is to certify that:</p>
+        <h2>{{ name }}</h2>
+        <p><strong>Address:</strong> {{ address }}</p>
+        <p><strong>Client ID:</strong> {{ client_id }}</p>
+        <p><strong>Registration ID:</strong> {{ reg_id }}</p>
+        <p><strong>Meter Number:</strong> {{ meter_number }}</p>
+        <p><strong>Property Type:</strong> {{ property_type }}</p>
+        <p><strong>Application Fee:</strong> ₱{{ total_application_fee }}</p>
+        <p><strong>Date:</strong> {{ date }}</p>
+    </div>
+    
+    <div class="signature">
+        <p>_________________________</p>
+        <p>Administrator</p>
+    </div>
+</body>
+</html>
+```
+
+### Invoice template
+
+```html templates/invoice-billing.html
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+        }
+        .total {
+            font-weight: bold;
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Water Bill Invoice</h1>
+    <p><strong>Bill ID:</strong> {{ billing_id }}</p>
+    <p><strong>Client:</strong> {{ client_name }}</p>
+    <p><strong>Period:</strong> {{ period_from }} to {{ period_to }}</p>
+    
+    <table>
+        <tr>
+            <th>Description</th>
+            <th>Amount</th>
+        </tr>
+        <tr>
+            <td>Previous Reading</td>
+            <td>{{ prev_reading }} m³</td>
+        </tr>
+        <tr>
+            <td>Current Reading</td>
+            <td>{{ curr_reading }} m³</td>
+        </tr>
+        <tr>
+            <td>Consumption</td>
+            <td>{{ consumption }} m³</td>
+        </tr>
+        <tr>
+            <td>Rate ({{ rate_type }})</td>
+            <td>₱{{ rate }} per m³</td>
+        </tr>
+        <tr>
+            <td>Billing Amount</td>
+            <td>₱{{ billing_amount }}</td>
+        </tr>
+        <tr>
+            <td>Penalty</td>
+            <td>₱{{ penalty }}</td>
+        </tr>
+        <tr class="total">
+            <td>Total Amount Due</td>
+            <td>₱{{ total_amount }}</td>
+        </tr>
+    </table>
+    
+    <p><strong>Due Date:</strong> {{ due_date }}</p>
+    <p><strong>Disconnection Date:</strong> {{ disconnection_date }}</p>
+    
+    <div style="margin-top: 30px; text-align: center;">
+        <img src="{{ qr_code }}" alt="QR Code" width="150">
+        <p>Scan to pay</p>
+    </div>
+</body>
+</html>
+```
+
+## QR code generation
+
+The system uses Endroid QR Code library for payment QR codes:
+
+### Installation
+
+```json composer.json
+{
+  "require": {
+    "endroid/qr-code": "^5.0"
+  }
+}
+```
+
+### Generating QR codes
+
+```php
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
+
+public function generateQrCode($billingId, $amount)
+{
+    // Create QR code data
+    $qrData = json_encode([
+        'billing_id' => $billingId,
+        'amount' => $amount,
+        'timestamp' => time()
+    ]);
+    
+    // Generate QR code
+    $qrCode = QrCode::create($qrData)
+        ->setSize(300)
+        ->setMargin(10);
+    
+    $writer = new PngWriter();
+    $result = $writer->write($qrCode);
+    
+    // Save to file
+    $qrPath = 'temp/qrcodes/' . $billingId . '.png';
+    $result->saveToFile($qrPath);
+    
+    return $qrPath;
+}
+```
+
+### Embedding QR codes in PDFs
+
+```php
+public function generateInvoiceWithQr($billingId)
+{
+    // Generate QR code
+    $qrPath = $this->generateQrCode($billingId, $amount);
+    
+    // Convert QR to base64 for embedding
+    $qrImage = file_get_contents($qrPath);
+    $qrBase64 = 'data:image/png;base64,' . base64_encode($qrImage);
+    
+    // Load template and replace placeholders
+    $html = file_get_contents("./templates/invoice-billing.html");
+    $html = str_replace("{{ qr_code }}", $qrBase64, $html);
+    
+    // Generate PDF
+    $dompdf = new Dompdf($options);
+    $dompdf->loadHtml($html);
+    $dompdf->render();
+    
+    return $dompdf->output();
+}
+```
+
+<Info>
+QR codes enable cashiers to quickly scan and process payments using mobile devices.
+</Info>
+
+## Document types
+
+The system generates several types of PDF documents:
+
+<Tabs>
+  <Tab title="Registration certificate">
+    Generated when admin approves a client application.
+    
+    **Template:** `admin/templates/reg-template.html`
+    
+    **Output:** `admin/temp/registration/{reg_id}.pdf`
+    
+    **Sent via:** Email attachment
+  </Tab>
+  
+  <Tab title="Billing statement">
+    Generated monthly by meter readers after verification.
+    
+    **Template:** `meter-reader/templates/billing-template.html`
+    
+    **Output:** `meter-reader/temp/billing/{billing_id}.pdf`
+    
+    **Sent via:** Email attachment
+  </Tab>
+  
+  <Tab title="Payment invoice">
+    Generated by cashier upon payment confirmation.
+    
+    **Template:** `cashier/templates/invoice-billing.html`
+    
+    **Output:** `cashier/temp/invoice/{transaction_id}.pdf`
+    
+    **Features:** QR code for verification
+  </Tab>
+  
+  <Tab title="Disconnection notice">
+    Generated for overdue accounts.
+    
+    **Template:** `admin/templates/disconnection_notice.html`
+    
+    **Output:** `admin/temp/notices/{client_id}.pdf`
+  </Tab>
+</Tabs>
+
+## Best practices
+
+<Accordion title="Use absolute paths for images">
+When including images in templates, use absolute paths or base64 encoding:
+
+```php
+$options->setChroot(__DIR__);
+$options->setIsRemoteEnabled(true);
+```
+</Accordion>
+
+<Accordion title="Optimize template size">
+Keep templates lightweight. Large templates increase generation time.
+</Accordion>
+
+<Accordion title="Clean up temporary files">
+Periodically delete old PDF files from temp/ directories:
+
+```php
+$files = glob('temp/registration/*.pdf');
+foreach ($files as $file) {
+    if (time() - filemtime($file) > 86400) { // 24 hours
+        unlink($file);
+    }
+}
+```
+</Accordion>
+
+<Accordion title="Error handling">
+Always check if PDF generation succeeded:
+
+```php
+if (!file_put_contents($filepath, $dompdf->output())) {
+    error_log("PDF generation failed for: " . $filepath);
+    return ['error' => 'Failed to generate PDF'];
+}
+```
+</Accordion>
+
+## Troubleshooting
+
+<Warning>
+**Problem:** "Call to undefined function mb_strlen()"
+
+**Solution:** Enable mbstring extension in php.ini
+</Warning>
+
+<Warning>
+**Problem:** Images not loading in PDF
+
+**Solution:** Set `isRemoteEnabled` and use absolute paths or base64 encoding
+</Warning>
+
+<Warning>
+**Problem:** Font not rendering correctly
+
+**Solution:** Use web-safe fonts (Helvetica, Arial, Times) or install custom fonts
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Email integration" icon="envelope" href="/development/email-integration">
+    Sending PDFs via email
+  </Card>
+  <Card title="Database queries" icon="database" href="/development/database-queries">
+    Fetching data for PDFs
+  </Card>
+</CardGroup>

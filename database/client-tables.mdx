@@ -1,0 +1,371 @@
+---
+title: Client Tables
+description: Client information and application tables schema
+icon: users
+---
+
+## client_data Table
+
+Stores active client information for registered water service customers.
+
+### Table Schema
+
+```sql
+CREATE TABLE `client_data` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `client_id` varchar(20) NOT NULL,
+  `reg_id` varchar(50) NOT NULL,
+  `meter_number` varchar(20) NOT NULL,
+  `full_name` text NOT NULL,
+  `email` varchar(50) NOT NULL,
+  `phone_number` varchar(20) NOT NULL,
+  `birthdate` varchar(20) NOT NULL,
+  `age` int(11) NOT NULL,
+  `property_type` varchar(15) NOT NULL,
+  `street` text NOT NULL,
+  `brgy` varchar(20) NOT NULL,
+  `full_address` text NOT NULL,
+  `status` enum('active','inactive','under_review') DEFAULT NULL,
+  `reading_status` enum('pending','read','encoded','under_review') NOT NULL DEFAULT 'pending',
+  `application_id` varchar(50) NOT NULL,
+  `time` time NOT NULL,
+  `date` date NOT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_update` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `client_id` (`client_id`),
+  KEY `meter_number` (`meter_number`)
+) ENGINE=InnoDB;
+```
+
+### Field Descriptions
+
+<ParamField path="id" type="int(11)" required>
+  Auto-incrementing primary key
+</ParamField>
+
+<ParamField path="client_id" type="varchar(20)" required>
+  Unique client identifier in format `WBS-XXX-NNNDMMYY`
+  
+  Example: `WBS-RGV-001012324` (Rogene G. Vito, registered on Jan 23, 2024)
+</ParamField>
+
+<ParamField path="reg_id" type="varchar(50)" required>
+  Registration ID in format `R` followed by timestamp digits
+  
+  Example: `R20240123033659`
+</ParamField>
+
+<ParamField path="meter_number" type="varchar(20)" required>
+  Water meter number assigned to the client
+  
+  Example: `W-89898`
+</ParamField>
+
+<ParamField path="full_name" type="text" required>
+  Client's complete name including suffix if applicable
+</ParamField>
+
+<ParamField path="email" type="varchar(50)" required>
+  Client's email address for notifications
+</ParamField>
+
+<ParamField path="phone_number" type="varchar(20)" required>
+  Client's contact phone number
+</ParamField>
+
+<ParamField path="birthdate" type="varchar(20)" required>
+  Client's date of birth (format may vary)
+</ParamField>
+
+<ParamField path="age" type="int(11)" required>
+  Client's age calculated from birthdate
+</ParamField>
+
+<ParamField path="property_type" type="varchar(15)" required>
+  Type of property connection
+  
+  **Values:**
+  - `Residential` - Residential property
+  - `Commercial` - Commercial property
+</ParamField>
+
+<ParamField path="street" type="text" required>
+  Street address of the property
+</ParamField>
+
+<ParamField path="brgy" type="varchar(20)" required>
+  Barangay (neighborhood) name - references `address` table
+</ParamField>
+
+<ParamField path="full_address" type="text" required>
+  Complete formatted address including municipality and region
+</ParamField>
+
+<ParamField path="status" type="enum" default="NULL">
+  Client account status
+  
+  **Values:**
+  - `active` - Active account with service
+  - `inactive` - Inactive or disconnected account
+  - `under_review` - Account under review
+</ParamField>
+
+<ParamField path="reading_status" type="enum" default="pending">
+  Current meter reading status
+  
+  **Values:**
+  - `pending` - Awaiting meter reading
+  - `read` - Meter has been read
+  - `encoded` - Reading has been entered into system
+  - `under_review` - Reading under review
+</ParamField>
+
+<ParamField path="application_id" type="varchar(50)" required>
+  Reference to original application record
+</ParamField>
+
+<ParamField path="time" type="time" required>
+  Time of registration
+</ParamField>
+
+<ParamField path="date" type="date" required>
+  Date of registration
+</ParamField>
+
+<ParamField path="timestamp" type="timestamp" default="current_timestamp()">
+  Record creation timestamp
+</ParamField>
+
+<ParamField path="last_update" type="timestamp" default="current_timestamp()">
+  Last modification timestamp
+</ParamField>
+
+---
+
+## client_application Table
+
+Stores new water service connection applications before client activation.
+
+### Table Schema
+
+```sql
+CREATE TABLE `client_application` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `meter_number` varchar(20) NOT NULL,
+  `first_name` varchar(50) NOT NULL,
+  `middle_name` varchar(50) NOT NULL,
+  `last_name` varchar(20) NOT NULL,
+  `name_suffix` varchar(20) DEFAULT NULL,
+  `full_name` text NOT NULL,
+  `email` varchar(50) NOT NULL,
+  `phone_number` varchar(20) NOT NULL,
+  `birthdate` varchar(20) NOT NULL,
+  `age` int(11) NOT NULL,
+  `gender` varchar(20) NOT NULL,
+  `property_type` varchar(15) NOT NULL,
+  `street` text NOT NULL,
+  `brgy` varchar(50) NOT NULL,
+  `municipality` varchar(50) NOT NULL,
+  `province` varchar(20) NOT NULL,
+  `region` varchar(50) NOT NULL,
+  `full_address` text NOT NULL,
+  `valid_id` varchar(10) NOT NULL,
+  `proof_of_ownership` varchar(10) NOT NULL,
+  `deed_of_sale` varchar(10) NOT NULL,
+  `affidavit` varchar(10) NOT NULL,
+  `status` varchar(20) NOT NULL,
+  `billing_status` enum('paid','unpaid') NOT NULL,
+  `application_id` varchar(50) NOT NULL,
+  `application_fee_id` varchar(50) NOT NULL,
+  `time` time NOT NULL,
+  `date` date NOT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`,`first_name`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB;
+```
+
+### Key Fields
+
+<ParamField path="application_id" type="varchar(50)" required>
+  Unique application identifier
+</ParamField>
+
+<ParamField path="status" type="varchar(20)" required>
+  Application processing status
+  
+  Common values:
+  - `unconfirmed` - Pending confirmation
+  - `confirmed` - Application approved
+</ParamField>
+
+<ParamField path="billing_status" type="enum" required>
+  Payment status for application fees
+  
+  **Values:**
+  - `paid` - Application fees paid
+  - `unpaid` - Payment pending
+</ParamField>
+
+<ParamField path="valid_id" type="varchar(10)" required>
+  Whether valid ID was provided
+  
+  **Values:** `Yes` or `No`
+</ParamField>
+
+<ParamField path="proof_of_ownership" type="varchar(10)" required>
+  Whether proof of property ownership was provided
+  
+  **Values:** `Yes` or `No`
+</ParamField>
+
+<ParamField path="deed_of_sale" type="varchar(10)" required>
+  Whether deed of sale document was provided
+  
+  **Values:** `Yes` or `No`
+</ParamField>
+
+<ParamField path="affidavit" type="varchar(10)" required>
+  Whether affidavit document was provided
+  
+  **Values:** `Yes` or `No`
+</ParamField>
+
+---
+
+## client_application_fees Table
+
+Stores the fee structure for new water service applications.
+
+### Table Schema
+
+```sql
+CREATE TABLE `client_application_fees` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `application_fee_id` varchar(50) NOT NULL,
+  `application_fee` decimal(7,2) NOT NULL,
+  `inspection_fee` decimal(7,2) NOT NULL,
+  `registration_fee` decimal(7,2) NOT NULL,
+  `connection_fee` decimal(7,2) NOT NULL,
+  `installation_fee` decimal(7,2) NOT NULL,
+  `reference_id` varchar(20) NOT NULL,
+  `time` time NOT NULL,
+  `date` date NOT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB;
+```
+
+### Fee Components
+
+<ParamField path="application_fee_id" type="varchar(50)" required>
+  Unique fee record identifier in format `AF` + timestamp
+  
+  Example: `AF20231108121743858`
+</ParamField>
+
+<ParamField path="application_fee" type="decimal(7,2)" required>
+  Base application processing fee
+</ParamField>
+
+<ParamField path="inspection_fee" type="decimal(7,2)" required>
+  Property inspection fee
+</ParamField>
+
+<ParamField path="registration_fee" type="decimal(7,2)" required>
+  Client registration fee
+</ParamField>
+
+<ParamField path="connection_fee" type="decimal(7,2)" required>
+  Water line connection fee
+</ParamField>
+
+<ParamField path="installation_fee" type="decimal(7,2)" required>
+  Meter installation fee
+</ParamField>
+
+<ParamField path="reference_id" type="varchar(20)" required>
+  User ID who created the fee record (typically `ADMIN_NN`)
+</ParamField>
+
+---
+
+## client_secondary_data Table
+
+Stores additional client demographic information and document verification details.
+
+### Table Schema
+
+```sql
+CREATE TABLE `client_secondary_data` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `client_id` varchar(20) NOT NULL,
+  `first_name` varchar(50) NOT NULL,
+  `middle_name` varchar(50) NOT NULL,
+  `last_name` varchar(50) NOT NULL,
+  `name_suffix` varchar(20) NOT NULL,
+  `property_type` varchar(50) NOT NULL,
+  `gender` varchar(20) NOT NULL,
+  `street` varchar(50) NOT NULL,
+  `brgy` varchar(50) NOT NULL,
+  `municipality` varchar(50) NOT NULL,
+  `province` varchar(50) NOT NULL,
+  `region` varchar(50) NOT NULL,
+  `valid_id` varchar(20) NOT NULL,
+  `proof_of_ownership` varchar(20) NOT NULL,
+  `deed_of_sale` varchar(20) NOT NULL,
+  `affidavit` varchar(20) NOT NULL,
+  `time` time DEFAULT NULL,
+  `date` date DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_update` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB;
+```
+
+---
+
+## address Table
+
+Master table for barangay (neighborhood) data in Roxas, Oriental Mindoro.
+
+### Table Schema
+
+```sql
+CREATE TABLE `address` (
+  `id` int(5) NOT NULL AUTO_INCREMENT,
+  `brgy` varchar(55) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB;
+```
+
+### Barangays Covered
+
+The system covers the following barangays:
+
+- San Aquilino
+- Victoria
+- San Miguel
+- Libertad
+- Little Tanauan
+- San Mariano
+- Mabuhay
+- San Rafael
+- San Vicente
+- Happy Valley
+- Cantil
+- Dangay
+- Bagumbayan
+- Paclasan
+- Odiong
+- Uyao
+- Dalahican
+- Libtong
+- San Isidro
+- San Jose
+- Maraska
+
+<Note>
+  All properties in the water billing system must be located within one of these barangays in Roxas, Oriental Mindoro.
+</Note>

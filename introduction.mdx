@@ -1,0 +1,181 @@
+---
+title: Introduction
+description: Welcome to the Roxas Water Billing System - a comprehensive solution for water utility providers
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="Hero Dark"
+/>
+
+## Welcome to Roxas Water Billing System
+
+The **Roxas Water Billing System** is a comprehensive SaaS platform designed to streamline and automate the billing processes of water utility providers. Built to enhance access to water services, this system offers a robust platform for managing billing, payment services, and customer data - ensuring efficient operations for community services, establishments, and organizations.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get your water billing system up and running in minutes
+  </Card>
+  <Card
+    title="Installation Guide"
+    icon="download"
+    href="/installation"
+  >
+    Step-by-step instructions to set up your environment
+  </Card>
+  <Card
+    title="User Roles"
+    icon="users"
+    href="/roles/admin"
+  >
+    Learn about Admin, Cashier, and Meter Reader portals
+  </Card>
+  <Card
+    title="Database Reference"
+    icon="database"
+    href="/database/overview"
+  >
+    Complete schema documentation and table structures
+  </Card>
+</CardGroup>
+
+## What is Roxas Water Billing System?
+
+Roxas Water Billing System is a full-featured water utility management platform that provides:
+
+- **Role-Based Access Control** - Three distinct portals (Admin, Cashier, Meter Reader) with specific permissions and workflows
+- **Automated Billing** - Streamlined billing calculations based on water consumption with automated rate application
+- **Client Management** - Comprehensive client onboarding with verification and approval workflows
+- **Payment Processing** - Integrated payment tracking with cashier confirmation system
+- **Meter Reading** - Digital meter reading input with verification workflows
+- **Reporting & Analytics** - Data analytics for usage patterns and financial reporting
+
+## Key Features
+
+### User-Friendly Interface
+Built with modern web technologies including PHP, JavaScript, jQuery, and Tailwind CSS, the system provides an intuitive interface for both administrators and customers.
+
+### Automated Billing Calculations
+The system automatically calculates billing amounts based on:
+- Water consumption (current reading - previous reading)
+- Rate types (Commercial vs Residential)
+- Penalty fees for overdue payments
+- Billing cycles and due dates
+
+### Secure Authentication System
+Role-based login system with three user designations:
+```php
+<select name="user_role" id="designation-select">
+  <option value="1">Admin</option>
+  <option value="2">Cashier</option>
+  <option value="3">Meter Reader</option>
+</select>
+```
+
+### Client Application Workflow
+Seamless client addition process with:
+1. Initial application encoding
+2. Admin review and verification
+3. Payment collection by cashiers
+4. Final approval and account activation
+5. Automatic notifications for status updates
+
+### Document Generation
+Print invoices, certificates, and reports using the integrated dompdf library:
+- Billing statements
+- Disconnection notices
+- Payment receipts
+- Usage reports
+
+### Real-Time Notifications
+Notification system that alerts:
+- Admins when clients pay for applications
+- Cashiers about new applications requiring processing
+- Staff about billing verification needs
+
+## Technology Stack
+
+<CardGroup cols={2}>
+  <Card title="Backend" icon="server">
+    - **PHP** - Server-side scripting
+    - **MySQL** - Database management
+    - **Composer** - Dependency management
+  </Card>
+  <Card title="Frontend" icon="palette">
+    - **JavaScript** - Client-side scripting
+    - **jQuery** - DOM manipulation and AJAX
+    - **Tailwind CSS** - Utility-first styling
+    - **Flowbite** - UI components
+  </Card>
+  <Card title="Libraries" icon="book">
+    - **dompdf** - PDF generation
+    - **PHPMailer** - Email notifications
+    - **ApexCharts** - Data visualization
+  </Card>
+  <Card title="Tools" icon="wrench">
+    - **validate.js** - Form validation
+    - **npm** - Package management
+    - **Git** - Version control
+  </Card>
+</CardGroup>
+
+## Database Architecture
+
+The system uses a well-structured MySQL database (`wbs_db`) with 22 tables including:
+
+- `users` - User accounts and authentication
+- `client_data` - Customer information
+- `client_application` - New client applications
+- `billing_data` - Billing records and consumption
+- `billing_cycle` - Billing periods management
+- `transactions` - Payment transactions
+- `meter_reading_logs` - Meter reader submissions
+- `rates` - Rate configurations
+- `penalty_fees` - Late payment penalties
+- `notifications` - System notifications
+
+<Note>
+  The database schema includes comprehensive logging tables for audit trails and data integrity.
+</Note>
+
+## Built For
+
+This system is specifically designed for:
+
+- **Water Utility Providers** - Municipal and private water districts
+- **Community Services** - Barangay and local water associations
+- **Establishments** - Commercial properties with metered water services
+- **Organizations** - Non-profit water service providers
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Set up your PHP environment and install dependencies
+  </Card>
+  <Card
+    title="Quick Start"
+    icon="bolt"
+    href="/quickstart"
+  >
+    Configure your database and create your first user
+  </Card>
+</CardGroup>
+
+<Warning>
+  This system requires PHP extensions `mbstring` and `gd` to be enabled for PDF generation functionality.
+</Warning>

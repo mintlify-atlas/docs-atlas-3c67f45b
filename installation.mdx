@@ -1,0 +1,374 @@
+---
+title: Installation
+description: Complete setup guide for the Roxas Water Billing System
+---
+
+## System Requirements
+
+Before installing the Roxas Water Billing System, ensure your environment meets the following requirements:
+
+### PHP Environment
+
+<Steps>
+  <Step title="PHP Version">
+    PHP 7.4 or higher is required for the system to function properly.
+  </Step>
+  
+  <Step title="Required PHP Extensions">
+    Enable the following extensions in your `php.ini` file:
+    
+    ```ini
+    extension=mbstring
+    extension=gd
+    ```
+    
+    These extensions are necessary for:
+    - **mbstring** - Multibyte string processing (required by dompdf)
+    - **gd** - Image processing capabilities (required for PDF generation)
+  </Step>
+  
+  <Step title="MySQL Database">
+    MySQL 5.7+ or MariaDB 10.4+ for database management
+  </Step>
+</Steps>
+
+<Warning>
+  The system uses `dompdf` for PDF generation. Without `mbstring` and `gd` extensions enabled, invoice and report generation will fail.
+</Warning>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the project to your local machine or web server:
+    
+    ```bash
+    git clone <repository-url>
+    cd wbs
+    ```
+  </Step>
+
+  <Step title="Install PHP Dependencies">
+    The system uses Composer for PHP dependency management. Install dependencies for each role-based portal:
+    
+    <CodeGroup>
+    ```bash Admin Portal
+    cd admin
+    composer install
+    ```
+    
+    ```bash Cashier Portal
+    cd cashier
+    composer install
+    ```
+    
+    ```bash Meter Reader Portal
+    cd meter-reader
+    composer install
+    ```
+    </CodeGroup>
+    
+    Each portal requires the following packages:
+    
+    ```json composer.json
+    {
+      "require": {
+        "dompdf/dompdf": "^2.0",
+        "league/oauth2-google": "^4.0",
+        "phpmailer/phpmailer": "^6.8"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Install JavaScript Dependencies">
+    Install frontend dependencies using npm:
+    
+    ```bash
+    npm install
+    ```
+    
+    This will install the following packages:
+    
+    ```json package.json
+    {
+      "devDependencies": {
+        "@tailwindcss/forms": "^0.5.3",
+        "tailwindcss": "^3.3.5"
+      },
+      "dependencies": {
+        "apexcharts": "^3.45.1",
+        "flowbite": "^1.8.1",
+        "flowbite-datepicker": "^1.2.2",
+        "jquery": "^3.7.1",
+        "validate.js": "^0.13.1"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Build Tailwind CSS">
+    Compile the Tailwind CSS styles:
+    
+    <CodeGroup>
+    ```bash Development (Watch Mode)
+    npm run dev
+    ```
+    
+    ```bash Production Build
+    npx tailwindcss -i ./src/input.css -o ./assets/css/style.css --minify
+    ```
+    </CodeGroup>
+    
+    The Tailwind configuration includes:
+    
+    ```javascript tailwind.config.js
+    module.exports = {
+      content: [
+        "./authentication/**/*.{html,php,js}",
+        "./admin/**/*.{html,php,js}",
+        "./meter-reader/**/*.{html,php,js}",
+        "./cashier/**/*.{html,php,js}",
+        "./index.php"
+      ],
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: "#eef2ff",
+              400: "#818cf8",
+              500: "#6366f1",
+              600: "#4f46e5",
+              700: "#4338ca"
+            }
+          }
+        }
+      },
+      plugins: [
+        require('flowbite/plugin')({
+          charts: true
+        }),
+        require('@tailwindcss/forms')
+      ]
+    }
+    ```
+  </Step>
+
+  <Step title="Set Up MySQL Database">
+    Create a new MySQL database and import the schema:
+    
+    ```bash
+    # Create database
+    mysql -u root -p -e "CREATE DATABASE wbs_db;"
+    
+    # Import schema (use the latest backup file)
+    mysql -u root -p wbs_db < DB_BACKUP/wbs_db_backup-2024-04-26_09-53-01.sql
+    ```
+    
+    The database includes 22 tables:
+    - `users` - User authentication
+    - `client_data` - Customer records
+    - `client_application` - New applications
+    - `billing_data` - Billing information
+    - `billing_cycle` - Billing periods
+    - `transactions` - Payment records
+    - `meter_reading_logs` - Meter readings
+    - `rates` - Pricing configuration
+    - `penalty_fees` - Late payment fees
+    - `notifications` - System alerts
+    - And 12 more supporting tables
+  </Step>
+
+  <Step title="Configure Database Connection">
+    Update the database configuration for each portal. The configuration is managed through JSON files:
+    
+    Create or edit `admin/database/config.json`:
+    
+    ```json
+    {
+      "database1": {
+        "db_host": "localhost",
+        "db_user": "your_username",
+        "db_password": "your_password",
+        "db_name": "wbs_db"
+      },
+      "database2": {
+        "db_host": "localhost",
+        "db_user": "your_username",
+        "db_password": "your_password",
+        "db_name": "wbs_db"
+      }
+    }
+    ```
+    
+    <Note>
+      Repeat this configuration for `cashier/database/config.json` and `meter-reader/database/config.json`
+    </Note>
+    
+    The config.php file reads from this JSON:
+    
+    ```php admin/database/config.php
+    <?php
+    $configPath = __DIR__ . '/config.json';
+    $config = json_decode(file_get_contents($configPath), true);
+    
+    $database1Config = $config['database1'];
+    $host1 = $database1Config['db_host'];
+    $username1 = $database1Config['db_user'];
+    $password1 = $database1Config['db_password'];
+    $database1 = $database1Config['db_name'];
+    ```
+  </Step>
+
+  <Step title="Configure Base URLs">
+    Update the base URL in the configuration file to match your installation path:
+    
+    ```php admin/database/config.php
+    define('BASE_URL', 'http://localhost/wbs/');
+    define('HOME_URL', BASE_URL);
+    define('CLIENTS_URL', BASE_URL . 'admin/clients.php');
+    define('DASHBOARD_URL', BASE_URL . 'admin/dashboard.php');
+    ```
+    
+    Replace `http://localhost/wbs/` with your actual server path.
+  </Step>
+
+  <Step title="Set Directory Permissions">
+    Ensure the web server has write permissions for:
+    
+    ```bash
+    chmod -R 755 uploads/
+    chmod -R 755 DB_BACKUP/
+    chmod -R 755 .php_tmp/
+    ```
+    
+    These directories are used for:
+    - `uploads/` - Client documents and images
+    - `DB_BACKUP/` - Automatic database backups
+    - `.php_tmp/` - Temporary PHP files
+  </Step>
+
+  <Step title="Start Local Server">
+    Run the system on a local development server:
+    
+    <CodeGroup>
+    ```bash Apache/XAMPP
+    # Place the project in htdocs folder
+    # Access via http://localhost/wbs/
+    ```
+    
+    ```bash PHP Built-in Server
+    php -S localhost:8000
+    # Access via http://localhost:8000/
+    ```
+    
+    ```bash Laravel Valet (macOS)
+    valet link wbs
+    # Access via http://wbs.test/
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Verification
+
+After installation, verify the setup:
+
+<AccordionGroup>
+  <Accordion title="Check PHP Extensions">
+    Create a `phpinfo.php` file:
+    
+    ```php
+    <?php phpinfo(); ?>
+    ```
+    
+    Access it in your browser and search for:
+    - mbstring: Enabled
+    - gd: Enabled
+  </Accordion>
+  
+  <Accordion title="Test Database Connection">
+    Navigate to the sign-in page:
+    
+    ```
+    http://localhost/wbs/authentication/signin.php
+    ```
+    
+    If the page loads without errors, database connection is successful.
+  </Accordion>
+  
+  <Accordion title="Verify CSS Compilation">
+    Check that the compiled CSS file exists:
+    
+    ```bash
+    ls -la assets/css/style.css
+    ```
+    
+    If missing, run `npm run dev` to generate it.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="PDF Generation Fails">
+    Ensure PHP extensions are enabled:
+    
+    ```bash
+    # Find your php.ini file
+    php --ini
+    
+    # Edit and uncomment these lines:
+    extension=mbstring
+    extension=gd
+    
+    # Restart your web server
+    ```
+  </Accordion>
+  
+  <Accordion title="Database Connection Error">
+    Verify your `config.json` credentials:
+    
+    ```bash
+    # Test MySQL connection
+    mysql -u your_username -p wbs_db
+    ```
+    
+    Ensure the database name matches exactly: `wbs_db`
+  </Accordion>
+  
+  <Accordion title="Composer Dependencies Not Found">
+    Install dependencies in each portal directory:
+    
+    ```bash
+    cd admin && composer install
+    cd ../cashier && composer install
+    cd ../meter-reader && composer install
+    ```
+  </Accordion>
+  
+  <Accordion title="Tailwind Styles Not Loading">
+    Rebuild the CSS file:
+    
+    ```bash
+    npm run dev
+    ```
+    
+    Check that `assets/css/style.css` is properly linked in your PHP files.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+  Continue to the Quick Start guide to create your first user account and configure the system
+</Card>
+
+<Note>
+  For production deployment, ensure you:
+  - Change all default passwords
+  - Enable HTTPS/SSL
+  - Configure proper file upload limits
+  - Set up automated database backups
+  - Configure PHPMailer for email notifications
+</Note>

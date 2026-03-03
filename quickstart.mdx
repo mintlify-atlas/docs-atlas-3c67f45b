@@ -1,80 +1,588 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get started with the Roxas Water Billing System in minutes
 ---
 
-## Get started in three steps
+## Get Started in 5 Minutes
 
-Get your documentation site running locally and make your first customization.
+This guide will help you set up and run the Roxas Water Billing System quickly. By the end, you'll have a working system with your first user account and understand the basic workflow.
 
-### Step 1: Set up your local environment
+<Note>
+  Make sure you've completed the [Installation](/installation) steps before proceeding with this guide.
+</Note>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+## Initial Setup
+
+<Steps>
+  <Step title="Import the Database">
+    Import the latest database schema from the backup folder:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```bash
+    mysql -u root -p -e "CREATE DATABASE wbs_db;"
+    mysql -u root -p wbs_db < DB_BACKUP/wbs_db_backup-2024-04-26_09-53-01.sql
+    ```
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    This will create the `wbs_db` database with all necessary tables including:
+    - User accounts and roles
+    - Client data structures
+    - Billing and transaction tables
+    - Rate configurations
+    - System logs and notifications
+  </Step>
 
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+  <Step title="Configure Database Connection">
+    Create the database configuration file for each portal:
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    **For Admin Portal** - `admin/database/config.json`:
+    
+    ```json
+    {
+      "database1": {
+        "db_host": "localhost",
+        "db_user": "root",
+        "db_password": "your_password",
+        "db_name": "wbs_db"
+      },
+      "database2": {
+        "db_host": "localhost",
+        "db_user": "root",
+        "db_password": "your_password",
+        "db_name": "wbs_db"
+      }
+    }
+    ```
+    
+    <Note>
+      Copy this configuration to `cashier/database/config.json` and `meter-reader/database/config.json`
+    </Note>
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Create Your First Admin Account">
+    Insert an admin user directly into the database:
+    
+    ```sql
+    -- Insert user ID
+    INSERT INTO user_id VALUES (1);
+    
+    -- Create admin account (password: 'admin123')
+    INSERT INTO users (user_id, user_name, designation, email, password) 
+    VALUES (
+      'USR-00001', 
+      'System Administrator', 
+      'Admin', 
+      'admin@wbs.local',
+      '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
+    );
+    ```
+    
+    <Warning>
+      This is a sample password hash. In production, use PHP's `password_hash()` function to create secure password hashes.
+    </Warning>
+  </Step>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Access the System">
+    Navigate to the sign-in page:
+    
+    ```
+    http://localhost/wbs/authentication/signin.php
+    ```
+    
+    The sign-in form includes role selection:
+    
+    ```php
+    <select name="user_role" id="designation-select">
+      <option value="1">Admin</option>
+      <option value="2">Cashier</option>
+      <option value="3">Meter Reader</option>
+    </select>
+    ```
+  </Step>
 
-### Step 3: Go live
+  <Step title="Sign In">
+    Use your admin credentials:
+    
+    - **Designation:** Admin
+    - **Email:** admin@wbs.local
+    - **Password:** admin123
+    
+    Upon successful authentication, you'll be redirected to:
+    
+    ```
+    http://localhost/wbs/admin/dashboard.php
+    ```
+  </Step>
+</Steps>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Understanding the Dashboard
 
-## Next steps
-
-Now that you have your docs running, explore these key features:
+After signing in, you'll see the admin dashboard which displays:
 
 <CardGroup cols={2}>
+  <Card title="Client Statistics" icon="users">
+    - Total active clients
+    - New applications
+    - Client by location/barangay
+  </Card>
+  
+  <Card title="Billing Overview" icon="file-invoice-dollar">
+    - Current billing cycle
+    - Unpaid bills
+    - Revenue statistics
+  </Card>
+  
+  <Card title="Recent Activities" icon="clock">
+    - Latest transactions
+    - Recent meter readings
+    - System notifications
+  </Card>
+  
+  <Card title="Quick Actions" icon="bolt">
+    - Add new client
+    - Process applications
+    - Generate reports
+  </Card>
+</CardGroup>
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+## Basic Workflow Tutorial
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+Let's walk through a complete billing cycle from client creation to bill payment.
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+### 1. Adding a New Client
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+<Steps>
+  <Step title="Navigate to Client Application">
+    From the admin dashboard, go to:
+    
+    ```
+    Admin → Clients → Client Application Form
+    ```
+    
+    Or access directly:
+    ```
+    http://localhost/wbs/admin/client_application_form.php
+    ```
+  </Step>
 
+  <Step title="Fill Out Application Form">
+    The application form collects:
+    
+    - **Personal Information**
+      - Full name (First, Middle, Last)
+      - Contact number
+      - Email address
+    
+    - **Address Details**
+      - Barangay (from pre-configured list)
+      - Street address
+      - Property type (Residential/Commercial)
+    
+    - **Connection Details**
+      - Meter number
+      - Initial meter reading
+      - Installation date
+    
+    The form uses client-side validation:
+    ```javascript
+    // Validation powered by validate.js
+    $('#form-client-application').validate({
+      rules: {
+        email: { required: true, email: true },
+        contact: { required: true, pattern: /^09\d{9}$/ }
+      }
+    });
+    ```
+  </Step>
+
+  <Step title="Submit Application">
+    Upon submission, the application:
+    
+    1. Is saved to the `client_application` table
+    2. Status set to "pending"
+    3. Notification sent to admin for review
+    4. Application ID generated (e.g., APP-00001)
+  </Step>
+
+  <Step title="Review Application">
+    Navigate to:
+    
+    ```
+    Admin → Clients → Applications Table
+    ```
+    
+    Review the application and verify:
+    - Client information accuracy
+    - Meter number uniqueness
+    - Address validity
+    - Document uploads (if any)
+  </Step>
+
+  <Step title="Approve Application">
+    After verification:
+    
+    1. Click "Approve" on the application
+    2. Set application fee amount
+    3. System generates payment reference
+    4. Client is notified to pay application fee
+  </Step>
+</Steps>
+
+### 2. Processing Application Payment
+
+<Steps>
+  <Step title="Switch to Cashier Portal">
+    Sign out from Admin and sign in as Cashier:
+    
+    ```
+    http://localhost/wbs/authentication/signin.php
+    ```
+    
+    Select "Cashier" designation
+  </Step>
+
+  <Step title="Receive Payment">
+    From cashier dashboard:
+    
+    1. Navigate to "Pending Applications"
+    2. Find the client's application
+    3. Click "Receive Payment"
+    4. Enter payment details:
+       - Payment amount
+       - Payment method (Cash/Check/Bank Transfer)
+       - Receipt number
+  </Step>
+
+  <Step title="Confirm Payment">
+    After payment confirmation:
+    
+    1. Transaction recorded in `transactions` table
+    2. Notification sent to admin
+    3. Application marked as "paid"
+    4. Receipt can be printed
+  </Step>
+
+  <Step title="Admin Final Approval">
+    Switch back to Admin portal:
+    
+    1. Navigate to paid applications
+    2. Click "Finalize" on the application
+    3. Client data moved to `client_data` table
+    4. Client ID generated (e.g., CL-00001)
+    5. Account activated for billing
+  </Step>
+</Steps>
+
+### 3. Recording Meter Readings
+
+<Steps>
+  <Step title="Switch to Meter Reader Portal">
+    Sign in as Meter Reader:
+    
+    ```
+    http://localhost/wbs/authentication/signin.php
+    ```
+    
+    Select "Meter Reader" designation
+  </Step>
+
+  <Step title="Start New Billing Cycle">
+    Admin creates a new billing cycle:
+    
+    ```sql
+    INSERT INTO billing_cycle (billing_cycle, type, time, date) 
+    VALUES ('December 2024', 'ongoing', NOW(), CURDATE());
+    ```
+  </Step>
+
+  <Step title="Input Meter Readings">
+    Meter reader navigates to "Add Meter Reading":
+    
+    1. Select client by meter number or name
+    2. Enter current meter reading
+    3. System shows:
+       - Previous reading
+       - Calculated consumption
+       - Reading type (Regular/Adjustment)
+    
+    Example data structure:
+    ```sql
+    -- Meter reading logged
+    INSERT INTO meter_reading_logs (
+      client_id,
+      meter_number,
+      prev_reading,
+      curr_reading,
+      consumption,
+      reading_type,
+      billing_month,
+      encoder
+    ) VALUES (
+      'CL-00001',
+      'MTR-12345',
+      100.00,
+      125.50,
+      25.50,
+      'Regular',
+      'December 2024',
+      'MTR-00001'
+    );
+    ```
+  </Step>
+
+  <Step title="Submit Readings">
+    After submission:
+    
+    1. Reading saved to `meter_reading_logs`
+    2. Status: "unverified"
+    3. Notification sent to admin for verification
+  </Step>
+</Steps>
+
+### 4. Generating Bills
+
+<Steps>
+  <Step title="Verify Meter Readings">
+    Admin reviews submitted readings:
+    
+    ```
+    Admin → Billing → Verify Readings
+    ```
+    
+    For each reading:
+    - Check for anomalies (unusually high/low consumption)
+    - Verify meter number matches client
+    - Approve or request re-reading
+  </Step>
+
+  <Step title="Generate Billing Data">
+    Once verified, admin generates bills:
+    
+    1. Navigate to "Generate Bills"
+    2. Select billing cycle
+    3. System automatically:
+       - Calculates consumption (current - previous)
+       - Applies appropriate rates (Commercial/Residential)
+       - Adds penalties for overdue accounts
+       - Generates billing ID (e.g., BILL-00001)
+    
+    ```php
+    // Billing calculation logic
+    $consumption = $curr_reading - $prev_reading;
+    $billing_amount = $consumption * $rate;
+    
+    // Add penalty if previous bill overdue
+    if ($has_overdue) {
+        $billing_amount += $penalty_fee;
+    }
+    ```
+  </Step>
+
+  <Step title="Set Due Dates">
+    System automatically sets:
+    
+    - Due date (e.g., 15 days from bill generation)
+    - Disconnection date (e.g., 30 days from bill generation)
+    - Billing period (from-to dates)
+  </Step>
+
+  <Step title="Print Billing Statements">
+    Generate PDF bills for distribution:
+    
+    1. Navigate to "Print Bills"
+    2. Select clients or billing cycle
+    3. Click "Generate PDF"
+    4. System uses dompdf to create statements
+    
+    Bills can be:
+    - Downloaded as PDF
+    - Printed in bulk
+    - Sent via email (if PHPMailer configured)
+  </Step>
+</Steps>
+
+### 5. Processing Bill Payments
+
+<Steps>
+  <Step title="Cashier Receives Payment">
+    In the Cashier portal:
+    
+    1. Navigate to "Bill Payments"
+    2. Search by client ID or name
+    3. Display unpaid bills
+    4. Select bill to pay
+  </Step>
+
+  <Step title="Record Payment">
+    Enter payment details:
+    
+    - Payment amount
+    - Payment method
+    - Payment date
+    - Reference number
+    
+    ```sql
+    -- Transaction recorded
+    INSERT INTO transactions (
+      transaction_id,
+      client_id,
+      billing_id,
+      amount_paid,
+      payment_method,
+      payment_date,
+      cashier_id
+    ) VALUES (
+      'TXN-00001',
+      'CL-00001',
+      'BILL-00001',
+      450.75,
+      'Cash',
+      CURDATE(),
+      'CSH-00001'
+    );
+    ```
+  </Step>
+
+  <Step title="Update Billing Status">
+    After payment confirmation:
+    
+    1. Bill status changed to "paid"
+    2. Payment recorded in transactions table
+    3. Receipt generated
+    4. Notification sent to client (if email enabled)
+  </Step>
+
+  <Step title="Print Receipt">
+    Generate payment receipt:
+    
+    1. Click "Print Receipt"
+    2. PDF generated with:
+       - Transaction details
+       - Amount paid
+       - Billing information
+       - Payment method
+       - Official receipt number
+  </Step>
+</Steps>
+
+## Common Administrative Tasks
+
+<AccordionGroup>
+  <Accordion title="Configure Water Rates">
+    Navigate to `Admin → Rates`:
+    
+    Set pricing for different consumption tiers:
+    
+    ```sql
+    INSERT INTO rates (rate_fee_id, rate_type, min_consumption, max_consumption, price_per_cubic) 
+    VALUES 
+      ('RATE-RES-001', 'Residential', 0, 10, 15.00),
+      ('RATE-RES-002', 'Residential', 11, 20, 20.00),
+      ('RATE-COM-001', 'Commercial', 0, 999, 35.00);
+    ```
+  </Accordion>
+  
+  <Accordion title="Set Penalty Fees">
+    Configure late payment penalties:
+    
+    ```sql
+    INSERT INTO penalty_fees (penalty_type, penalty_amount, applicable_after_days) 
+    VALUES ('Late Payment', 50.00, 15);
+    ```
+  </Accordion>
+  
+  <Accordion title="View System Logs">
+    Access comprehensive audit trails:
+    
+    - `logs` - General system activities
+    - `meter_reading_logs` - All meter readings
+    - `generated_billing_logs` - Bill generation history
+    - `penalty_logs` - Applied penalties
+    - `email_logs` - Email notifications sent
+  </Accordion>
+  
+  <Accordion title="Generate Reports">
+    Admin can generate various reports:
+    
+    1. Navigate to `Admin → Reports`
+    2. Select report type:
+       - Monthly revenue report
+       - Usage statistics by barangay
+       - Active/inactive clients
+       - Outstanding balances
+       - Collection summary
+    3. Choose date range
+    4. Export as PDF or Excel
+  </Accordion>
+  
+  <Accordion title="Manage Disconnection Notices">
+    For overdue accounts:
+    
+    1. System automatically flags accounts past disconnection date
+    2. Navigate to `Admin → Disconnection Notices`
+    3. Generate disconnection notice PDF
+    4. Print and distribute to affected clients
+  </Accordion>
+</AccordionGroup>
+
+## User Role Summary
+
+<CardGroup cols={3}>
+  <Card title="Admin" icon="user-shield">
+    **Full System Access**
+    
+    - Manage all clients
+    - Configure rates & fees
+    - Verify meter readings
+    - Generate bills
+    - View all reports
+    - Manage users
+    - Approve applications
+  </Card>
+  
+  <Card title="Cashier" icon="cash-register">
+    **Payment Processing**
+    
+    - Receive payments
+    - Issue receipts
+    - View transaction history
+    - Process application fees
+    - Daily collection reports
+  </Card>
+  
+  <Card title="Meter Reader" icon="gauge">
+    **Reading Entry**
+    
+    - Input meter readings
+    - View assigned clients
+    - Submit reading reports
+    - Upload meter photos
+    - Track reading history
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="User Roles Guide" icon="users" href="/roles/admin">
+    Learn more about each portal's features and permissions
+  </Card>
+  
+  <Card title="Database Reference" icon="database" href="/database/overview">
+    Explore the complete database schema and relationships
+  </Card>
+  
+  <Card title="Developer Guide" icon="code" href="/development/architecture">
+    Understand the system architecture and integration
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/database">
+    Advanced configuration options and customization
+  </Card>
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **Pro Tip**: Use the search and filter features in each table to quickly find clients, bills, and transactions. All data tables support pagination, sorting, and filtering by barangay/location.
 </Note>
+
+<Warning>
+  **Security Reminder**: Always log out when finished, especially in production environments. Each role has specific permissions - never share credentials across roles.
+</Warning>

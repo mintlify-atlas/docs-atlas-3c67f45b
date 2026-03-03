@@ -1,0 +1,447 @@
+---
+title: Frontend architecture
+description: UI components, styling system, and JavaScript modules
+---
+
+The Roxas Water Billing System uses modern frontend technologies with a utility-first CSS approach and component-based JavaScript modules.
+
+## Technology stack
+
+<CardGroup cols={2}>
+  <Card title="Tailwind CSS" icon="palette">
+    Utility-first CSS framework for rapid UI development
+  </Card>
+  <Card title="Flowbite" icon="shapes">
+    Component library built on Tailwind CSS
+  </Card>
+  <Card title="ApexCharts" icon="chart-line">
+    Modern charting library for dashboard analytics
+  </Card>
+  <Card title="jQuery" icon="js">
+    DOM manipulation and AJAX requests
+  </Card>
+</CardGroup>
+
+## Tailwind CSS configuration
+
+The system uses a custom Tailwind configuration with an indigo color palette:
+
+```javascript tailwind.config.js
+const defaultTheme = require("tailwindcss/defaultTheme");
+
+module.exports = {
+  content: [
+    "./node_modules/flowbite/**/*.js",
+    "./authentication/**/*.{html,php,js}",
+    "./admin/**/*.{html,php,js}",
+    "./meter-reader/**/*.{html,php,js}",
+    "./cashier/**/*.{html,php,js}",
+    "./index.php",
+    "./**/*.html",
+    "./**/*.php",
+    "./**/*.js"
+  ],
+  theme: {
+    extend: {
+      screens: {
+        xs: "540px",
+        ...defaultTheme.screens,
+      },
+      colors: {
+        primary: {
+          50: "#eef2ff",
+          100: "#e0e7ff",
+          200: "#c7d2fe",
+          300: "#a5b4fc",
+          400: "#818cf8",
+          500: "#6366f1",
+          600: "#4f46e5",
+          700: "#4338ca",
+          800: "#3730a3",
+          900: "#312e81",
+          950: "#1e1b4b",
+        },
+      },
+      boxShadow: {
+        sm: "0 1px 3px 0 rgba(15, 23, 42, 0.07), 0 1px 2px 0 rgba(15, 23, 42, 0.03)",
+        md: "0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -1px rgba(15, 23, 42, 0.03)",
+        lg: "0 10px 15px -3px rgba(15, 23, 42, 0.07), 0 4px 6px -2px rgba(15, 23, 42, 0.02)",
+        xl: "0 20px 25px -5px rgba(15, 23, 42, 0.07), 0 10px 10px -5px rgba(15, 23, 42, 0.02)",
+      },
+      fontFamily: {
+        sans: ['Inter var', ...defaultTheme.fontFamily.sans],
+      },
+    },
+  },
+  plugins: [
+    require('flowbite/plugin')({
+      charts: true,
+    }),
+    require('@tailwindcss/forms')
+  ],
+};
+```
+
+### Build process
+
+Tailwind CSS is compiled using the npm script:
+
+```bash package.json
+npm run dev
+```
+
+This watches for changes and compiles:
+```
+src/input.css → assets/css/style.css
+```
+
+<Info>
+The compiled CSS file is included in all portal layouts via `layouts/links.php`.
+</Info>
+
+## Flowbite components
+
+Flowbite provides pre-built UI components:
+
+### Modals
+
+```html
+<button data-modal-target="example-modal" data-modal-toggle="example-modal">
+  Open Modal
+</button>
+
+<div id="example-modal" tabindex="-1" class="hidden">
+  <!-- Modal content -->
+</div>
+```
+
+### Dropdowns
+
+```html
+<button data-dropdown-toggle="dropdown">
+  Dropdown button
+</button>
+
+<div id="dropdown" class="hidden">
+  <!-- Dropdown items -->
+</div>
+```
+
+### Datepickers
+
+Used extensively for date selection:
+
+```html
+<input type="text" datepicker datepicker-format="yyyy-mm-dd" />
+```
+
+### Tables
+
+Data tables with sorting and filtering:
+
+```html
+<table class="w-full text-sm text-left">
+  <thead class="text-xs uppercase bg-gray-50">
+    <!-- Table headers -->
+  </thead>
+  <tbody>
+    <!-- Table rows -->
+  </tbody>
+</table>
+```
+
+## JavaScript modules
+
+The system uses modular JavaScript for different features:
+
+### DataTableWithPagination.js
+
+Handles table pagination, search, and filtering:
+
+```javascript
+class DataTableWithPagination {
+  constructor(config) {
+    this.tableBody = document.querySelector(config.tableBodySelector);
+    this.paginationContainer = document.querySelector(config.paginationSelector);
+    this.searchInput = document.querySelector(config.searchSelector);
+    this.itemsPerPage = config.itemsPerPage || 10;
+    this.currentPage = 1;
+    this.filteredData = [];
+    this.allData = [];
+  }
+
+  init(data) {
+    this.allData = data;
+    this.filteredData = data;
+    this.render();
+    this.attachEventListeners();
+  }
+}
+```
+
+### AddressFetcher.js
+
+Dynamically loads barangay addresses:
+
+```javascript
+class AddressFetcher {
+  constructor(selectElement) {
+    this.selectElement = selectElement;
+  }
+
+  async fetchAddresses() {
+    const response = await fetch('database_actions.php?action=fetch_addresses');
+    const data = await response.json();
+    this.populateSelect(data);
+  }
+}
+```
+
+### clientActions.js
+
+Handles client CRUD operations:
+
+```javascript
+function addClient(formData) {
+  $.ajax({
+    url: 'database_actions.php',
+    type: 'POST',
+    data: {
+      action: 'add_client',
+      ...formData
+    },
+    success: function(response) {
+      // Handle success
+    },
+    error: function(error) {
+      // Handle error
+    }
+  });
+}
+```
+
+### chartsData.js
+
+Fetches and prepares data for ApexCharts:
+
+```javascript
+function fetchChartData() {
+  fetch('charts_data.php')
+    .then(response => response.json())
+    .then(data => {
+      renderPieChart(data.clientDistribution);
+      renderBarChart(data.monthlyRevenue);
+      renderLineChart(data.consumption);
+    });
+}
+```
+
+## ApexCharts integration
+
+Dashboard charts use ApexCharts for visualizations:
+
+### Pie chart - Client distribution
+
+```javascript
+const pieOptions = {
+  series: [activeClients, inactiveClients, underReview],
+  chart: {
+    type: 'pie',
+    height: 350
+  },
+  labels: ['Active', 'Inactive', 'Under Review'],
+  colors: ['#10b981', '#ef4444', '#f59e0b'],
+  legend: {
+    position: 'bottom'
+  }
+};
+
+const pieChart = new ApexCharts(
+  document.querySelector('#client-distribution-chart'),
+  pieOptions
+);
+pieChart.render();
+```
+
+### Bar chart - Monthly revenue
+
+```javascript
+const barOptions = {
+  series: [{
+    name: 'Revenue',
+    data: monthlyRevenueData
+  }],
+  chart: {
+    type: 'bar',
+    height: 350
+  },
+  xaxis: {
+    categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+  },
+  colors: ['#4338ca']
+};
+```
+
+### Line chart - Water consumption
+
+```javascript
+const lineOptions = {
+  series: [{
+    name: 'Consumption',
+    data: consumptionData
+  }],
+  chart: {
+    type: 'line',
+    height: 350
+  },
+  stroke: {
+    curve: 'smooth'
+  }
+};
+```
+
+## jQuery usage
+
+While the system uses modern JavaScript for most features, jQuery handles:
+
+### AJAX requests
+
+```javascript
+$.ajax({
+  url: 'database_actions.php',
+  type: 'POST',
+  data: { action: 'get_data' },
+  dataType: 'json',
+  success: function(response) {
+    // Process response
+  }
+});
+```
+
+### DOM manipulation
+
+```javascript
+$('#element-id').show();
+$('#element-id').hide();
+$('#element-id').addClass('active');
+$('#element-id').html('New content');
+```
+
+### Event handling
+
+```javascript
+$('#button-id').on('click', function() {
+  // Handle click
+});
+
+$('#form-id').on('submit', function(e) {
+  e.preventDefault();
+  // Handle form submission
+});
+```
+
+## Form validation
+
+The system uses validate.js for client-side validation:
+
+```javascript application_validate.js
+const constraints = {
+  first_name: {
+    presence: { message: "First name is required" },
+    length: {
+      minimum: 2,
+      maximum: 50
+    }
+  },
+  email: {
+    presence: true,
+    email: true
+  },
+  phone_number: {
+    presence: true,
+    format: {
+      pattern: /^[0-9]{11}$/,
+      message: "must be 11 digits"
+    }
+  }
+};
+
+const errors = validate(formData, constraints);
+if (errors) {
+  displayErrors(errors);
+}
+```
+
+## Responsive design
+
+Tailwind's responsive modifiers ensure mobile compatibility:
+
+```html
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  <!-- Responsive grid -->
+</div>
+
+<div class="hidden md:block">
+  <!-- Desktop only -->
+</div>
+
+<div class="block md:hidden">
+  <!-- Mobile only -->
+</div>
+```
+
+## Component structure
+
+Typical page component structure:
+
+```php components/dashboard_main.php
+<div class="flex flex-col gap-5">
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-12 gap-x-6 w-full">
+    <div class="col-span-12 md:col-span-3 bg-white shadow-sm p-4 rounded-md">
+      <h2 class="font-semibold text-gray-500 text-lg">Total Clients</h2>
+      <h1 id="total_clients" class="font-bold text-3xl"></h1>
+    </div>
+    <!-- More cards... -->
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-12 gap-6">
+    <div class="col-span-12 lg:col-span-8">
+      <div id="revenue-chart"></div>
+    </div>
+    <div class="col-span-12 lg:col-span-4">
+      <div id="distribution-chart"></div>
+    </div>
+  </div>
+</div>
+```
+
+## Best practices
+
+<Accordion title="Use Tailwind utilities over custom CSS">
+Prefer Tailwind classes for consistency and maintainability. Only write custom CSS when absolutely necessary.
+</Accordion>
+
+<Accordion title="Modularize JavaScript">
+Keep JavaScript organized in separate files by feature. Use classes for reusable components.
+</Accordion>
+
+<Accordion title="Validate client-side and server-side">
+Always validate on both the client (for UX) and server (for security).
+</Accordion>
+
+<Accordion title="Use semantic HTML">
+Proper HTML structure improves accessibility and SEO.
+</Accordion>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    System architecture overview
+  </Card>
+  <Card title="Database queries" icon="database" href="/development/database-queries">
+    Backend query patterns
+  </Card>
+</CardGroup>

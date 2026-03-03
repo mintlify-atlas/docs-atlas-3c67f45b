@@ -1,0 +1,417 @@
+---
+title: 'Cashier Portal'
+description: 'Payment processing hub for application fees and billing confirmations with receipt generation'
+---
+
+## Overview
+
+The Cashier portal (`/cashier/`) is the financial gateway of the Roxas Water Billing System. Cashiers are responsible for confirming payments from clients, generating receipts, and notifying administrators of completed transactions. This role ensures accurate payment processing and maintains financial records.
+
+<CardGroup cols={2}>
+  <Card title="Application Payments" icon="file-invoice-dollar">
+    Confirm application fee payments and trigger admin approval workflow
+  </Card>
+  <Card title="Billing Payments" icon="money-check-alt">
+    Process monthly water bill payments and update billing status
+  </Card>
+  <Card title="Receipt Generation" icon="receipt">
+    Automatically generate and email PDF receipts to clients
+  </Card>
+  <Card title="Transaction Recording" icon="database">
+    Create permanent transaction records with complete payment details
+  </Card>
+</CardGroup>
+
+## Core Responsibilities
+
+### 1. Application Payment Confirmation
+
+**Location**: `application_payments.php`
+
+Process one-time application fee payments for new client connections:
+
+#### Payment Workflow
+
+<Steps>
+  <Step title="Review Confirmed Applications">
+    View applications with status `confirmed` and billing_status `unpaid`
+  </Step>
+  <Step title="Verify Payment Amount">
+    Confirm client paid the correct total application fee (sum of all fee components)
+  </Step>
+  <Step title="Enter Payment Details">
+    Input amount paid and any payment reference information
+  </Step>
+  <Step title="Confirm Payment">
+    System generates transaction record and updates application status
+  </Step>
+  <Step title="Notify Administrator">
+    Admin receives notification to approve the application
+  </Step>
+</Steps>
+
+<CodeGroup>
+```php database_queries.php:613
+public function confirmAppPayment($formData)
+{
+    $applicationID = htmlspecialchars($formData['applicationID'], ENT_QUOTES, 'UTF-8');
+    $amountPaid = htmlspecialchars($formData['amountPaid'], ENT_QUOTES, 'UTF-8');
+    
+    $transactionID = $this->generateTransactionID();
+    $transactionType = 'application_payment';
+    
+    // Retrieve application fee breakdown
+    $clientApplicationFees = $this->retrieveClientApplicationFees();
+    $amountDue = intval($applicationFee) + intval($inspectionFee) + 
+                 intval($registrationFee) + intval($connectionFee) + 
+                 intval($installationFee);
+    
+    // Calculate change
+    $remainingBalance = intval($amountPaid) - intval($amountDue);
+    
+    // Insert transaction record
+    $this->insertIntoTransactions($transactionData);
+    
+    // Update application billing status
+    $this->updateClientApplication($applicationID, $applicationFeeID);
+    
+    // Notify administrator
+    $this->addNotification($userID, $message, 'payment_confirmation', $applicationID);
+}
+```
+</CodeGroup>
+
+**Fee Components** (configured by Admin):
+- Application Fee
+- Inspection Fee  
+- Registration Fee
+- Connection Fee
+- Installation Fee
+
+<Note>
+The cashier views the current fee structure from `client_application_fees` table. These fees are set by administrators and apply to all pending applications.
+</Note>
+
+### 2. Billing Payment Confirmation
+
+**Location**: `billing_payments.php`
+
+Process recurring monthly water bill payments:
+
+#### Payment Workflow
+
+<Steps>
+  <Step title="Scan or Enter Client ID">
+    QR code scanning supported for quick client lookup
+  </Step>
+  <Step title="Retrieve Billing Information">
+    System fetches current unpaid bill with consumption details
+  </Step>
+  <Step title="Calculate Total Amount">
+    Display billing amount + penalty + tax (12% default)
+  </Step>
+  <Step title="Accept Payment">
+    Enter amount paid from client
+  </Step>
+  <Step title="Generate Receipt">
+    PDF receipt automatically created and emailed to client
+  </Step>
+  <Step title="Update Records">
+    Billing status changed to 'paid' and transaction logged
+  </Step>
+</Steps>
+
+<CodeGroup>
+```php database_queries.php:432
+public function confirmBillingPayment($formData)
+{
+    $clientID = htmlspecialchars($formData['clientID'], ENT_QUOTES, 'UTF-8');
+    $amountPaid = htmlspecialchars($formData['amountPaid'], ENT_QUOTES, 'UTF-8');
+    
+    // Retrieve billing data
+    $billingData = $this->retrieveBillingData($clientID);
+    $billingAmount = $billingData['billingData']['billing_amount'];
+    $penalty = $billingData['billingData']['penalty'];
+    
+    // Get current tax rate
+    $rates = $this->retrieveBillingRates();
+    $taxRate = $rates['rates']['tax'];
+    
+    // Calculate total
+    $calculatedTotalBill = $this->calculateTotalBill($billingAmount, $penalty, $taxRate);
+    $taxAmount = $calculatedTotalBill[0];
+    $totalWithTax = $calculatedTotalBill[1];
+    
+    // Insert transaction
+    $this->insertIntoTransactions($transactionData);
+    
+    // Update billing status
+    $this->updateBillingData($billingID);
+    
+    // Generate and email receipt
+    $pdfGenerator->generateBillingReceipt($receiptData);
+    $wbsMailer->handleEmailSend($clientData, $emailPath);
+}
+```
+</CodeGroup>
+
+**Bill Calculation**:
+```
+Base Amount = Consumption (m³) × Rate (per m³)
+Penalty = Late payment fees (if applicable)
+Tax = Base Amount × 12%
+Total Due = Base Amount + Penalty + Tax
+Change = Amount Paid - Total Due
+```
+
+### 3. Receipt Generation
+
+**Location**: `receipt.php` (uses `database_queries.php`)
+
+Automatic PDF receipt creation for billing payments:
+
+**Receipt Contents**:
+- QR code with transaction ID
+- Account number (Client ID)
+- Client name and address
+- Meter number
+- Property type
+- Consumption amount
+- Penalty charges
+- Tax amount (12%)
+- Total amount due
+- Cashier name
+- Date and timestamp
+
+<CodeGroup>
+```php database_queries.php:60
+public function generateBillingReceipt($receiptData)
+{
+    // Initialize Dompdf with options
+    $dompdf = new Dompdf($options);
+    $dompdf->setPaper(array(0, 0, 504, 504), 'portrait');
+    
+    // Generate QR code for transaction
+    $qrCode = new QrCode($receiptData['no']);
+    $writer = new PngWriter();
+    $result = $writer->write($qrCode);
+    $qrDataUri = $result->getDataUri();
+    
+    // Load receipt template
+    $template = file_get_contents('templates/invoice-billing.html');
+    $invoiceHtml = str_replace(
+        ['{{tx_qr}}', '{{transaction_id}}', '{{account_no}}', ...],
+        [$qrDataUri, $no, $accountNo, ...],
+        $template
+    );
+    
+    // Generate PDF
+    $dompdf->loadHtml($invoiceHtml);
+    $dompdf->render();
+    
+    // Save to temp directory
+    $filename = $no . '.pdf';
+    $filepath = 'temp/receipts/' . $filename;
+    file_put_contents($filepath, $dompdf->output());
+}
+```
+</CodeGroup>
+
+<Tip>
+Receipts are automatically emailed to the client's registered email address using the `WBSMailer` class, which integrates with Gmail SMTP.
+</Tip>
+
+### 4. Transaction Recording
+
+**Location**: Handled via `insertIntoTransactions()` in `database_queries.php`
+
+Every payment confirmation creates a permanent transaction record:
+
+**Transaction Data**:
+- `transaction_id`: Unique timestamp-based ID
+- `transaction_type`: "application_payment" or "bill_payment"
+- `reference_id`: Application ID or Billing ID
+- `client_id`: Client account (blank for applications)
+- `transaction_desc`: Human-readable description
+- `amount_due`: Total amount owed
+- `amount_paid`: Amount received from client
+- `remaining_balance`: Change returned to client
+- `confirmed_by`: Cashier user ID
+- `time`, `date`, `timestamp`: Payment datetime
+
+<Info>
+Transaction IDs are generated using the format: `[Unix Timestamp][4-digit Random Number]`, ensuring uniqueness across all payments.
+</Info>
+
+## Notification System
+
+Cashiers receive notifications for:
+
+<AccordionGroup>
+  <Accordion title="Application Confirmations">
+    When administrators confirm application details, cashiers are notified that payment can be collected (type: `application_confirmation`)
+  </Accordion>
+</AccordionGroup>
+
+Cashiers send notifications to:
+
+<AccordionGroup>
+  <Accordion title="Payment Confirmations">
+    After confirming application payments, cashiers notify administrators to approve the application (type: `payment_confirmation`)
+  </Accordion>
+</AccordionGroup>
+
+## Dashboard Overview
+
+**Location**: `dashboard.php`
+
+The cashier dashboard provides a simplified view focused on payment operations:
+
+- Quick access to pending payments
+- Recent transaction history
+- Payment summary statistics
+
+<Note>
+The cashier dashboard has limited analytics compared to the admin dashboard, focusing on operational efficiency rather than strategic oversight.
+</Note>
+
+## QR Code Payment Support
+
+**Location**: `billing_payments.php` (uses `html5-qrcode` library)
+
+For billing payments, cashiers can scan client ID QR codes:
+
+1. Click QR scan button in payment modal
+2. Allow camera access
+3. Scan client's QR code (from bill or client card)
+4. System automatically retrieves billing information
+5. Proceed with payment confirmation
+
+<CodeGroup>
+```html billing_payments.php:36
+<script src="./assets/libs/html5-qrcode/html5-qrcode.min.js"></script>
+<script type="module" src="./assets/js/acceptBillingPayment.js"></script>
+```
+</CodeGroup>
+
+## Data Tables
+
+### Application Payments Table
+
+Displays applications ready for payment:
+- Application ID
+- Client name
+- Property type
+- Address (Barangay and Street)
+- Application date
+- **Action**: "Payment" button
+
+**Filters**:
+- Status: `confirmed` (admin verified)
+- Billing Status: `unpaid`
+
+### Billing Payments Table  
+
+Displays unpaid bills:
+- Billing ID
+- Client ID
+- Client name
+- Property type
+- Billing amount (formatted as currency)
+- Reading date
+- **Action**: "Payment" button
+
+**Filters**:
+- Billing Type: `billed` (reading verified)
+- Billing Status: `unpaid`
+
+## Reports Access
+
+**Location**: `reports.php`
+
+Cashiers can generate payment-focused reports:
+- Daily collection reports
+- Payment transaction history
+- Receipt regeneration (if needed)
+
+## Access & Permissions
+
+<Warning>
+**Limited Scope**: Cashiers can only confirm payments and view payment-related data. They cannot modify rates, approve applications, or access client management features.
+</Warning>
+
+**Cashier Permissions**:
+- ✅ View confirmed applications awaiting payment
+- ✅ View unpaid billing records
+- ✅ Confirm payment receipt
+- ✅ Generate transaction records
+- ✅ Create and email receipts
+- ✅ View own transaction history
+- ✅ Access payment reports
+- ✅ Update own profile
+- ❌ Approve or reject applications
+- ❌ Modify client information
+- ❌ Configure rates or fees
+- ❌ Delete transaction records
+
+## Navigation Structure
+
+**Main Menu**:
+- Payments
+  - Billing
+  - Application
+- Reports
+
+**Settings**:
+- User Profile
+
+## Best Practices
+
+<Check>
+**Verify Amount**: Always confirm the amount paid matches the total due before confirming payment.
+</Check>
+
+<Tip>
+**Receipt Delivery**: Verify client email addresses before confirming payment to ensure receipt delivery.
+</Tip>
+
+<Warning>
+**No Duplicates**: The system prevents duplicate payments by checking if a transaction already exists for the reference ID. If a client claims non-receipt, check the transaction log before attempting to reprocess.
+</Warning>
+
+## Error Handling
+
+**Common Issues**:
+
+1. **Duplicate Payment**: "Failed to insert new transaction. [Client] already paid, please check transaction history."
+   - **Solution**: Verify in transaction history. If payment was successful, regenerate receipt.
+
+2. **Email Failure**: "Failed to send receipt to email."
+   - **Solution**: Transaction still recorded. Manually email receipt from temp/receipts/ directory.
+
+3. **Invalid Client ID**: "No data found."
+   - **Solution**: Verify client ID format and billing status. Client may not have unpaid bills.
+
+## Technical Details
+
+**Payment Processing Flow**:
+1. User clicks "Payment" button with client/application ID
+2. System retrieves billing/application data
+3. Modal displays amount breakdown
+4. Cashier enters amount paid
+5. System validates and calculates change
+6. Transaction inserted (with rollback on failure)
+7. PDF receipt generated
+8. Email sent to client
+9. Notification sent to admin (if application payment)
+10. Success message displayed
+
+**Database Classes**:
+- `DatabaseQueries`: Main query handler
+- `PdfGenerator`: Receipt PDF creation
+- `WBSMailer`: Email delivery via PHPMailer
+
+**Session Data**:
+- `user_id`: Cashier identifier (recorded in transactions)
+- `user_name`: Display name (shown on receipts)
+- `user_role`: "cashier" role designation

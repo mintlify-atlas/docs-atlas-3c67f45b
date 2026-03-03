@@ -1,0 +1,202 @@
+---
+title: Database Configuration
+description: Set up and configure the MySQL database for Roxas Water Billing System
+---
+
+## Overview
+
+The Roxas Water Billing System uses MySQL/MariaDB for data storage with a JSON-based configuration approach. The system supports multiple database connections and uses a custom DatabaseConnection class for managing connections.
+
+## Database Requirements
+
+- **Database Server**: MySQL 5.7+ or MariaDB 10.4+
+- **Character Set**: utf8mb4
+- **Collation**: utf8mb4_general_ci
+- **Storage Engine**: InnoDB
+
+## Configuration Setup
+
+<Steps>
+  <Step title="Create the Database">
+    Create a new MySQL database named `wbs_db`:
+
+    ```sql
+    CREATE DATABASE wbs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+    ```
+  </Step>
+
+  <Step title="Import the Schema">
+    Import the database schema from the latest backup file in `DB_BACKUP/`:
+
+    ```bash
+    mysql -u root -p wbs_db < DB_BACKUP/wbs_db_backup-2024-04-26_09-53-01.sql
+    ```
+  </Step>
+
+  <Step title="Configure Database Connection">
+    Create or update `admin/database/config.json` with your database credentials:
+
+    ```json admin/database/config.json
+    {
+        "database1": {
+            "db_host": "localhost",
+            "db_user": "root",
+            "db_password": "",
+            "db_name": "wbs_db"
+        },
+        "database2": {
+            "db_host": "localhost",
+            "db_user": "root",
+            "db_password": "",
+            "db_name": "personal_db"
+        }
+    }
+    ```
+
+    <Warning>
+      Never commit `config.json` with production credentials to version control. Use environment-specific configurations.
+    </Warning>
+  </Step>
+
+  <Step title="Replicate Configuration">
+    Copy the `config.json` file to all module database directories:
+
+    ```bash
+    cp admin/database/config.json authentication/database/config.json
+    cp admin/database/config.json cashier/database/config.json
+    cp admin/database/config.json meter-reader/database/config.json
+    ```
+  </Step>
+</Steps>
+
+## Connection Implementation
+
+The system uses a custom DatabaseConnection class located in `admin/database/Database.php`:
+
+```php admin/database/Database.php
+<?php
+
+namespace Admin\Database;
+
+class DatabaseConnection
+{
+    protected $connection;
+
+    public function __construct($host, $username, $password, $database)
+    {
+        $this->connection = new \mysqli($host, $username, $password, $database);
+
+        if ($this->connection->connect_error) {
+            die("Connection failed: " . $this->connection->connect_error);
+        }
+    }
+
+    public function query($sql)
+    {
+        return $this->connection->query($sql);
+    }
+    
+    public function prepareStatement($sql)
+    {
+        return $this->connection->prepare($sql);
+    }
+    
+    // Additional methods for transactions, error handling, etc.
+}
+```
+
+### Using the Connection
+
+The connection is initialized in `admin/database/connection.php`:
+
+```php admin/database/connection.php
+<?php
+
+use Admin\Database\DatabaseConnection;
+
+include 'config.php';
+include 'Database.php';
+
+$conn = new DatabaseConnection($host1, $username1, $password1, $database1);
+```
+
+## Database Schema Overview
+
+The `wbs_db` database contains the following core tables:
+
+### Client Management
+- `client_data` - Main client information
+- `client_secondary_data` - Additional client details
+- `client_application` - New client applications
+- `client_application_fees` - Application fee structure
+- `clients_archive` - Archived client records
+
+### Billing System
+- `billing_cycle` - Billing period management
+- `billing_data` - Billing records and calculations
+- `meter_reading_logs` - Meter reading history
+- `meter_reports` - Meter reader reports
+- `rates` - Rate configuration
+- `penalty_fees` - Penalty rate structure
+- `penalty_logs` - Applied penalties
+
+### Transactions
+- `transactions` - Payment transactions
+- `temp__receipt` - Temporary receipt data
+- `generated_billing_logs` - Billing generation history
+
+### System Tables
+- `address` - Barangay/location data
+- `logs` - System activity logs
+- `log_changes` - Database change tracking
+- `notifications` - User notifications
+- `email_logs` - Email delivery tracking
+
+## Connection Parameters
+
+The `config.php` file loads the JSON configuration and sets up connection variables:
+
+```php admin/database/config.php
+<?php
+$configPath = __DIR__ . '/config.json';
+$config = json_decode(file_get_contents($configPath), true);
+
+$database1Config = $config['database1'];
+$database2Config = $config['database2'];
+
+// Primary database (wbs_db)
+$host1 = $database1Config['db_host'];
+$username1 = $database1Config['db_user'];
+$password1 = $database1Config['db_password'];
+$database1 = $database1Config['db_name'];
+
+// Secondary database (personal_db)
+$host2 = $database2Config['db_host'];
+$username2 = $database2Config['db_user'];
+$password2 = $database2Config['db_password'];
+$database2 = $database2Config['db_name'];
+```
+
+## Verification
+
+Test the database connection:
+
+```bash
+mysql -u root -p -e "USE wbs_db; SHOW TABLES;"
+```
+
+Expected output should list all system tables including `client_data`, `billing_data`, `transactions`, etc.
+
+<Warning>
+  Ensure the database user has appropriate privileges for CREATE, READ, UPDATE, DELETE, and EXECUTE operations on the `wbs_db` database.
+</Warning>
+
+## Backup Location
+
+Database backups are stored in `/DB_BACKUP/` with timestamped filenames:
+
+```
+DB_BACKUP/wbs_db_backup-YYYY-MM-DD_HH-MM-SS.sql
+```
+
+The system includes automated backup functionality that generates backups at scheduled intervals.

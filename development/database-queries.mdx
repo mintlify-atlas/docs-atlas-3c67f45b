@@ -1,0 +1,425 @@
+---
+title: Database queries
+description: Query patterns, prepared statements, and database operations
+---
+
+The Roxas Water Billing System uses object-oriented query classes with prepared statements for secure database operations.
+
+## BaseQuery pattern
+
+All query classes extend the `BaseQuery` class to inherit database connection:
+
+```php database_queries.php
+class BaseQuery
+{
+    protected $conn;
+
+    public function __construct(DatabaseConnection $databaseConnection)
+    {
+        $this->conn = $databaseConnection;
+    }
+}
+```
+
+### Usage
+
+```php
+// Initialize connection
+$conn = new DatabaseConnection($host, $username, $password, $database);
+
+// Create query instance
+$queryClass = new SomeQueryClass($conn);
+
+// Execute queries
+$result = $queryClass->someMethod($param);
+```
+
+## Query classes
+
+The system organizes queries into specialized classes:
+
+<CardGroup cols={2}>
+  <Card title="PdfGenerator" icon="file-pdf">
+    Queries for PDF generation (certificates, invoices)
+  </Card>
+  <Card title="WBSMailer" icon="envelope">
+    Email-related queries and sending
+  </Card>
+  <Card title="ClientManager" icon="users">
+    Client CRUD operations
+  </Card>
+  <Card title="BillingManager" icon="file-invoice">
+    Billing cycle and calculation queries
+  </Card>
+</CardGroup>
+
+## Prepared statements
+
+All queries use prepared statements to prevent SQL injection:
+
+### Basic select query
+
+```php
+public function getClientById($clientId)
+{
+    $sql = "SELECT * FROM client_data WHERE client_id = ?";
+    $stmt = $this->conn->prepareStatement($sql);
+    
+    if (!$stmt) {
+        return null;
+    }
+    
+    mysqli_stmt_bind_param($stmt, "s", $clientId);
+    mysqli_stmt_execute($stmt);
+    
+    $result = mysqli_stmt_get_result($stmt);
+    $row = mysqli_fetch_assoc($result);
+    
+    mysqli_stmt_close($stmt);
+    
+    return $row;
+}
+```
+
+### Insert query
+
+```php
+public function addClient($data)
+{
+    $sql = "INSERT INTO client_data 
+            (client_id, full_name, email, phone_number, full_address, 
+             property_type, meter_number, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+    
+    $stmt = $this->conn->prepareStatement($sql);
+    
+    mysqli_stmt_bind_param(
+        $stmt, 
+        "sssssss",
+        $data['client_id'],
+        $data['full_name'],
+        $data['email'],
+        $data['phone_number'],
+        $data['full_address'],
+        $data['property_type'],
+        $data['meter_number']
+    );
+    
+    $success = mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
+    
+    return $success;
+}
+```
+
+### Update query
+
+```php
+public function updateClientStatus($clientId, $status)
+{
+    $sql = "UPDATE client_data SET status = ?, updated_at = NOW() WHERE client_id = ?";
+    $stmt = $this->conn->prepareStatement($sql);
+    
+    mysqli_stmt_bind_param($stmt, "ss", $status, $clientId);
+    $success = mysqli_stmt_execute($stmt);
+    
+    mysqli_stmt_close($stmt);
+    
+    return $success;
+}
+```
+
+### Delete query
+
+```php
+public function deleteClient($clientId)
+{
+    $sql = "DELETE FROM client_data WHERE client_id = ?";
+    $stmt = $this->conn->prepareStatement($sql);
+    
+    mysqli_stmt_bind_param($stmt, "s", $clientId);
+    $success = mysqli_stmt_execute($stmt);
+    
+    mysqli_stmt_close($stmt);
+    
+    return $success;
+}
+```
+
+<Warning>
+Always use prepared statements with parameter binding. Never concatenate user input directly into SQL queries.
+</Warning>
+
+## Parameter binding types
+
+MySQL prepared statements support these type specifiers:
+
+| Type | Description | Example |
+|------|-------------|--------|
+| `s` | String | `"John Doe"` |
+| `i` | Integer | `12345` |
+| `d` | Double/Float | `123.45` |
+| `b` | Blob (binary) | Binary data |
+
+```php
+mysqli_stmt_bind_param($stmt, "ssid", $name, $email, $age, $balance);
+//                             ^^^^   ^^^^^ corresponds to types
+//                             types  values
+```
+
+## Transaction support
+
+For operations requiring atomicity:
+
+```php
+public function processPayment($billingId, $amount, $clientId)
+{
+    try {
+        // Begin transaction
+        $this->conn->beginTransaction();
+        
+        // Update billing status
+        $sql1 = "UPDATE billing_data SET billing_status = 'paid', 
+                 amount_paid = ? WHERE billing_id = ?";
+        $stmt1 = $this->conn->prepareStatement($sql1);
+        mysqli_stmt_bind_param($stmt1, "ds", $amount, $billingId);
+        mysqli_stmt_execute($stmt1);
+        
+        // Record transaction
+        $sql2 = "INSERT INTO transactions 
+                 (billing_id, client_id, amount, transaction_date) 
+                 VALUES (?, ?, ?, NOW())";
+        $stmt2 = $this->conn->prepareStatement($sql2);
+        mysqli_stmt_bind_param($stmt2, "ssd", $billingId, $clientId, $amount);
+        mysqli_stmt_execute($stmt2);
+        
+        // Commit transaction
+        $this->conn->commitTransaction();
+        
+        mysqli_stmt_close($stmt1);
+        mysqli_stmt_close($stmt2);
+        
+        return true;
+        
+    } catch (Exception $e) {
+        // Rollback on error
+        $this->conn->rollbackTransaction();
+        return false;
+    }
+}
+```
+
+<Info>
+Transactions ensure that either all operations succeed or none do, maintaining data integrity.
+</Info>
+
+## Complex queries
+
+### Join queries
+
+```php
+public function getClientWithBilling($clientId)
+{
+    $sql = "SELECT c.*, b.billing_id, b.billing_amount, b.due_date
+            FROM client_data c
+            LEFT JOIN billing_data b ON c.client_id = b.client_id
+            WHERE c.client_id = ?
+            ORDER BY b.due_date DESC";
+    
+    $stmt = $this->conn->prepareStatement($sql);
+    mysqli_stmt_bind_param($stmt, "s", $clientId);
+    mysqli_stmt_execute($stmt);
+    
+    $result = mysqli_stmt_get_result($stmt);
+    $rows = mysqli_fetch_all($result, MYSQLI_ASSOC);
+    
+    mysqli_stmt_close($stmt);
+    
+    return $rows;
+}
+```
+
+### Aggregate queries
+
+```php
+public function getTotalRevenue($startDate, $endDate)
+{
+    $sql = "SELECT SUM(billing_amount) as total_revenue
+            FROM billing_data
+            WHERE billing_status = 'paid'
+            AND payment_date BETWEEN ? AND ?";
+    
+    $stmt = $this->conn->prepareStatement($sql);
+    mysqli_stmt_bind_param($stmt, "ss", $startDate, $endDate);
+    mysqli_stmt_execute($stmt);
+    
+    $result = mysqli_stmt_get_result($stmt);
+    $row = mysqli_fetch_assoc($result);
+    
+    mysqli_stmt_close($stmt);
+    
+    return $row['total_revenue'] ?? 0;
+}
+```
+
+### Search with LIKE
+
+```php
+public function searchClients($searchTerm)
+{
+    $sql = "SELECT * FROM client_data 
+            WHERE full_name LIKE ? 
+            OR client_id LIKE ?
+            OR phone_number LIKE ?
+            ORDER BY full_name ASC";
+    
+    $stmt = $this->conn->prepareStatement($sql);
+    
+    $searchPattern = "%" . $searchTerm . "%";
+    mysqli_stmt_bind_param($stmt, "sss", 
+        $searchPattern, 
+        $searchPattern, 
+        $searchPattern
+    );
+    
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $rows = mysqli_fetch_all($result, MYSQLI_ASSOC);
+    
+    mysqli_stmt_close($stmt);
+    
+    return $rows;
+}
+```
+
+## Error handling
+
+Proper error handling prevents data corruption:
+
+```php
+public function safeQuery($clientId)
+{
+    $sql = "SELECT * FROM client_data WHERE client_id = ?";
+    $stmt = $this->conn->prepareStatement($sql);
+    
+    if (!$stmt) {
+        error_log("Prepare failed: " . $this->conn->getErrorMessage());
+        return ['error' => 'Database error'];
+    }
+    
+    mysqli_stmt_bind_param($stmt, "s", $clientId);
+    
+    if (!mysqli_stmt_execute($stmt)) {
+        error_log("Execute failed: " . mysqli_stmt_error($stmt));
+        mysqli_stmt_close($stmt);
+        return ['error' => 'Query failed'];
+    }
+    
+    $result = mysqli_stmt_get_result($stmt);
+    $row = mysqli_fetch_assoc($result);
+    
+    mysqli_stmt_close($stmt);
+    
+    return $row;
+}
+```
+
+## Query optimization
+
+<Accordion title="Use indexes">
+Ensure frequently queried columns have indexes:
+
+```sql
+CREATE INDEX idx_client_id ON billing_data(client_id);
+CREATE INDEX idx_billing_status ON billing_data(billing_status);
+CREATE INDEX idx_due_date ON billing_data(due_date);
+```
+</Accordion>
+
+<Accordion title="Limit result sets">
+Use LIMIT for pagination:
+
+```php
+$sql = "SELECT * FROM client_data LIMIT ? OFFSET ?";
+mysqli_stmt_bind_param($stmt, "ii", $limit, $offset);
+```
+</Accordion>
+
+<Accordion title="Select only needed columns">
+Avoid `SELECT *` in production:
+
+```php
+$sql = "SELECT client_id, full_name, email FROM client_data WHERE status = ?";
+```
+</Accordion>
+
+<Accordion title="Cache frequent queries">
+Store results in PHP sessions or variables for repeated use.
+</Accordion>
+
+## Common patterns
+
+### Checking if record exists
+
+```php
+public function clientExists($clientId)
+{
+    $sql = "SELECT COUNT(*) as count FROM client_data WHERE client_id = ?";
+    $stmt = $this->conn->prepareStatement($sql);
+    mysqli_stmt_bind_param($stmt, "s", $clientId);
+    mysqli_stmt_execute($stmt);
+    
+    $result = mysqli_stmt_get_result($stmt);
+    $row = mysqli_fetch_assoc($result);
+    
+    mysqli_stmt_close($stmt);
+    
+    return $row['count'] > 0;
+}
+```
+
+### Getting last inserted ID
+
+```php
+public function addClientAndGetId($data)
+{
+    $sql = "INSERT INTO client_data (...) VALUES (...)";
+    $stmt = $this->conn->prepareStatement($sql);
+    mysqli_stmt_bind_param($stmt, "sss", ...);
+    mysqli_stmt_execute($stmt);
+    
+    $lastId = mysqli_insert_id($this->conn->connection);
+    
+    mysqli_stmt_close($stmt);
+    
+    return $lastId;
+}
+```
+
+### Batch operations
+
+```php
+public function addMultipleClients($clientsArray)
+{
+    $sql = "INSERT INTO client_data (client_id, full_name) VALUES (?, ?)";
+    $stmt = $this->conn->prepareStatement($sql);
+    
+    foreach ($clientsArray as $client) {
+        mysqli_stmt_bind_param($stmt, "ss", $client['id'], $client['name']);
+        mysqli_stmt_execute($stmt);
+    }
+    
+    mysqli_stmt_close($stmt);
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Database schema" icon="database" href="/database/overview">
+    Explore the database structure
+  </Card>
+  <Card title="PDF generation" icon="file-pdf" href="/development/pdf-generation">
+    Document generation system
+  </Card>
+</CardGroup>

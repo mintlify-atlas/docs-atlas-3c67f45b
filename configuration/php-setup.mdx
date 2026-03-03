@@ -1,0 +1,557 @@
+---
+title: PHP Setup
+description: Configure PHP and install required dependencies for the Roxas Water Billing System
+---
+
+## PHP Version Requirements
+
+The Roxas Water Billing System requires:
+
+- **Minimum**: PHP 7.4
+- **Recommended**: PHP 8.0 or higher
+- **Tested on**: PHP 7.4 - 8.2
+
+## Required PHP Extensions
+
+<Warning>
+  The **mbstring** and **gd** extensions are absolutely required for dompdf to generate PDF invoices, certificates, and reports. The application will fail to generate PDFs without these extensions.
+</Warning>
+
+### Core Extensions
+
+The following PHP extensions must be enabled:
+
+| Extension | Purpose | Required For |
+|-----------|---------|-------------|
+| `mbstring` | Multibyte string processing | dompdf PDF generation |
+| `gd` | Image processing and manipulation | dompdf graphics in PDFs |
+| `mysqli` | MySQL database connectivity | Database operations |
+| `json` | JSON encoding/decoding | Configuration, API responses |
+| `curl` | HTTP requests | OAuth, email delivery |
+| `openssl` | Cryptography and SSL | Secure connections, OAuth |
+| `fileinfo` | File type detection | Upload validation |
+| `session` | Session management | User authentication |
+
+## PHP.ini Configuration
+
+<Steps>
+  <Step title="Locate php.ini File">
+    Find your active `php.ini` file:
+
+    ```bash
+    php --ini
+    ```
+
+    Output shows:
+    ```
+    Configuration File (php.ini) Path: /etc/php/8.0/cli
+    Loaded Configuration File:         /etc/php/8.0/cli/php.ini
+    ```
+
+    For web servers, you may need to edit:
+    - Apache: `/etc/php/8.0/apache2/php.ini`
+    - FPM: `/etc/php/8.0/fpm/php.ini`
+  </Step>
+
+  <Step title="Enable Required Extensions">
+    Edit `php.ini` and uncomment (remove the `;` prefix) these lines:
+
+    ```ini php.ini
+    ; Essential for dompdf PDF generation
+    extension=mbstring
+    extension=gd
+
+    ; Database connectivity
+    extension=mysqli
+
+    ; General requirements
+    extension=json
+    extension=curl
+    extension=openssl
+    extension=fileinfo
+    ```
+
+    If the extension lines don't exist, add them to the `[PHP]` section.
+  </Step>
+
+  <Step title="Configure PHP Settings">
+    Adjust these settings in `php.ini` for optimal performance:
+
+    ```ini php.ini
+    ; Memory limit for PDF generation and large operations
+    memory_limit = 256M
+
+    ; File upload limits
+    upload_max_filesize = 10M
+    post_max_size = 10M
+
+    ; Execution time for long-running operations
+    max_execution_time = 120
+    max_input_time = 120
+
+    ; Error reporting (adjust for production)
+    error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
+    display_errors = Off
+    log_errors = On
+    error_log = /var/log/php_errors.log
+
+    ; Session configuration
+    session.save_handler = files
+    session.save_path = "/var/lib/php/sessions"
+    session.gc_maxlifetime = 1440
+
+    ; Timezone
+    date.timezone = Asia/Manila
+    ```
+  </Step>
+
+  <Step title="Restart Web Server">
+    After modifying `php.ini`, restart your web server:
+
+    ```bash
+    # Apache on Ubuntu/Debian
+    sudo systemctl restart apache2
+
+    # Apache on CentOS/RHEL
+    sudo systemctl restart httpd
+
+    # Nginx with PHP-FPM
+    sudo systemctl restart php-fpm
+    sudo systemctl restart nginx
+    ```
+  </Step>
+</Steps>
+
+## Installing PHP Extensions
+
+### Ubuntu/Debian
+
+```bash
+# Install all required extensions
+sudo apt-get update
+sudo apt-get install -y \
+  php-mbstring \
+  php-gd \
+  php-mysqli \
+  php-json \
+  php-curl \
+  php-xml \
+  php-zip
+
+# Restart Apache
+sudo systemctl restart apache2
+```
+
+### CentOS/RHEL
+
+```bash
+# Install required extensions
+sudo yum install -y \
+  php-mbstring \
+  php-gd \
+  php-mysqlnd \
+  php-json \
+  php-curl \
+  php-xml \
+  php-zip
+
+# Restart Apache
+sudo systemctl restart httpd
+```
+
+### macOS (Homebrew)
+
+```bash
+# Most extensions are included with Homebrew PHP
+brew install php@8.0
+
+# If needed, install specific extensions
+brew install php-gd
+```
+
+### Windows (XAMPP/WAMP)
+
+Extensions are included but disabled by default. Edit `php.ini` through the control panel and uncomment the required extensions.
+
+## Composer Setup
+
+<Steps>
+  <Step title="Install Composer">
+    Download and install Composer globally:
+
+    ```bash
+    # Download installer
+    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+
+    # Install globally
+    php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+
+    # Remove installer
+    php -r "unlink('composer-setup.php');"
+
+    # Verify installation
+    composer --version
+    ```
+
+    Expected output:
+    ```
+    Composer version 2.x.x
+    ```
+  </Step>
+
+  <Step title="Configure Composer (Optional)">
+    Set Composer to use more memory if needed:
+
+    ```bash
+    # Increase memory limit for Composer operations
+    export COMPOSER_MEMORY_LIMIT=-1
+
+    # Or run individual commands with increased memory
+    php -d memory_limit=-1 $(which composer) install
+    ```
+  </Step>
+</Steps>
+
+## Vendor Dependencies
+
+The system uses different Composer packages for each module:
+
+### Admin Module Dependencies
+
+```json admin/composer.json
+{
+    "name": "dell/admin",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Dell\\Admin\\": "src/"
+        }
+    },
+    "require": {
+        "dompdf/dompdf": "^2.0",
+        "league/oauth2-google": "^4.0",
+        "phpmailer/phpmailer": "^6.8"
+    }
+}
+```
+
+**Install admin dependencies:**
+
+```bash
+cd admin
+composer install
+```
+
+### Cashier Module Dependencies
+
+```json cashier/composer.json
+{
+    "name": "dell/admin",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Dell\\Admin\\": "src/"
+        }
+    },
+    "require": {
+        "dompdf/dompdf": "^2.0",
+        "endroid/qr-code": "^5.0",
+        "phpmailer/phpmailer": "^6.8",
+        "league/oauth2-google": "^4.0"
+    }
+}
+```
+
+**Install cashier dependencies:**
+
+```bash
+cd cashier
+composer install
+```
+
+### Meter Reader Module Dependencies
+
+```json meter-reader/composer.json
+{
+    "name": "dell/admin",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Dell\\Admin\\": "src/"
+        }
+    },
+    "require": {
+        "dompdf/dompdf": "^2.0",
+        "endroid/qr-code": "^5.0",
+        "phpmailer/phpmailer": "^6.8",
+        "league/oauth2-google": "^4.0"
+    }
+}
+```
+
+**Install meter reader dependencies:**
+
+```bash
+cd meter-reader
+composer install
+```
+
+## Package Details
+
+### dompdf/dompdf ^2.0
+
+**Purpose**: PDF generation for invoices, certificates, and reports
+
+**Requirements**:
+- PHP mbstring extension
+- PHP gd extension
+- Memory: 128MB+ (256MB recommended)
+
+**Used For**:
+- Client invoices
+- Payment receipts
+- Billing reports
+- Certificate of no arrears
+- Monthly usage reports
+
+### phpmailer/phpmailer ^6.8
+
+**Purpose**: Email delivery system
+
+**Requirements**:
+- PHP openssl extension (for SMTP)
+- PHP sockets extension
+
+**Used For**:
+- Application approval notifications
+- Billing reminders
+- Electronic billing delivery
+- Payment confirmations
+
+### league/oauth2-google ^4.0
+
+**Purpose**: Google OAuth 2.0 authentication
+
+**Requirements**:
+- PHP curl extension
+- PHP json extension
+
+**Used For**:
+- Google Sign-In integration
+- OAuth-based authentication
+
+### endroid/qr-code ^5.0
+
+**Purpose**: QR code generation
+
+**Requirements**:
+- PHP gd extension
+
+**Used For**:
+- Payment receipt QR codes
+- Quick access codes
+
+## Autoloading
+
+All modules use PSR-4 autoloading. After running `composer install`, include the autoloader:
+
+```php
+<?php
+require_once __DIR__ . '/vendor/autoload.php';
+
+use Admin\Database\DatabaseConnection;
+use Dompdf\Dompdf;
+use PHPMailer\PHPMailer\PHPMailer;
+```
+
+## Verification Steps
+
+<Steps>
+  <Step title="Verify PHP Installation">
+    ```bash
+    php -v
+    ```
+
+    Should show PHP 7.4 or higher.
+  </Step>
+
+  <Step title="Check Required Extensions">
+    ```bash
+    php -m | grep -E "(mbstring|gd|mysqli|json|curl|openssl)"
+    ```
+
+    All extensions should appear in the output:
+    ```
+    curl
+    gd
+    json
+    mbstring
+    mysqli
+    openssl
+    ```
+  </Step>
+
+  <Step title="Test Extension Functionality">
+    Create a test file `test_extensions.php`:
+
+    ```php test_extensions.php
+    <?php
+    echo "Testing PHP Extensions...\n\n";
+
+    // Test mbstring
+    if (extension_loaded('mbstring')) {
+        echo "✓ mbstring: ENABLED\n";
+    } else {
+        echo "✗ mbstring: MISSING (REQUIRED FOR DOMPDF)\n";
+    }
+
+    // Test GD
+    if (extension_loaded('gd')) {
+        echo "✓ gd: ENABLED\n";
+    } else {
+        echo "✗ gd: MISSING (REQUIRED FOR DOMPDF)\n";
+    }
+
+    // Test mysqli
+    if (extension_loaded('mysqli')) {
+        echo "✓ mysqli: ENABLED\n";
+    } else {
+        echo "✗ mysqli: MISSING (REQUIRED FOR DATABASE)\n";
+    }
+
+    // Test other extensions
+    $extensions = ['json', 'curl', 'openssl', 'fileinfo'];
+    foreach ($extensions as $ext) {
+        echo extension_loaded($ext) ? "✓ $ext: ENABLED\n" : "✗ $ext: MISSING\n";
+    }
+    ```
+
+    Run the test:
+    ```bash
+    php test_extensions.php
+    ```
+  </Step>
+
+  <Step title="Verify Composer Dependencies">
+    From the admin directory:
+
+    ```bash
+    cd admin
+    composer show
+    ```
+
+    Should list all installed packages including:
+    - dompdf/dompdf
+    - phpmailer/phpmailer
+    - league/oauth2-google
+  </Step>
+
+  <Step title="Test Autoloading">
+    Create `test_autoload.php` in the admin directory:
+
+    ```php admin/test_autoload.php
+    <?php
+    require_once __DIR__ . '/vendor/autoload.php';
+
+    echo "Testing Composer autoloading...\n\n";
+
+    // Test dompdf
+    try {
+        $dompdf = new \Dompdf\Dompdf();
+        echo "✓ Dompdf loaded successfully\n";
+    } catch (Exception $e) {
+        echo "✗ Dompdf error: " . $e->getMessage() . "\n";
+    }
+
+    // Test PHPMailer
+    try {
+        $mail = new \PHPMailer\PHPMailer\PHPMailer();
+        echo "✓ PHPMailer loaded successfully\n";
+    } catch (Exception $e) {
+        echo "✗ PHPMailer error: " . $e->getMessage() . "\n";
+    }
+    ```
+
+    Run:
+    ```bash
+    php test_autoload.php
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### dompdf Errors
+
+If you encounter dompdf errors:
+
+1. **Check mbstring**: `php -m | grep mbstring`
+2. **Check GD**: `php -m | grep gd`
+3. **Increase memory**: Set `memory_limit = 256M` in php.ini
+4. **Check file permissions**: Ensure vendor/dompdf/dompdf/lib/fonts is writable
+
+### Composer Install Failures
+
+```bash
+# Clear Composer cache
+composer clear-cache
+
+# Install with verbose output
+composer install -vvv
+
+# Install with increased memory
+php -d memory_limit=-1 $(which composer) install
+```
+
+### Extension Not Loading
+
+1. Check that extension files exist in the PHP extension directory:
+   ```bash
+   php -i | grep extension_dir
+   ls -la /path/to/extension_dir/ | grep -E "(mbstring|gd)"
+   ```
+
+2. Verify you're editing the correct php.ini:
+   ```bash
+   php -i | grep "Loaded Configuration File"
+   ```
+
+3. Restart the web server after any php.ini changes
+
+## Production Considerations
+
+<Warning>
+  In production environments, disable error display and enable error logging:
+
+  ```ini
+  display_errors = Off
+  log_errors = On
+  error_log = /var/log/php/error.log
+  ```
+</Warning>
+
+### Recommended Production Settings
+
+```ini php.ini (Production)
+memory_limit = 256M
+max_execution_time = 120
+upload_max_filesize = 10M
+post_max_size = 10M
+
+; Error handling
+display_errors = Off
+display_startup_errors = Off
+log_errors = On
+error_log = /var/log/php/error.log
+error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
+
+; Security
+expose_php = Off
+allow_url_fopen = On
+allow_url_include = Off
+
+; Session security
+session.cookie_httponly = 1
+session.cookie_secure = 1
+session.use_strict_mode = 1
+```

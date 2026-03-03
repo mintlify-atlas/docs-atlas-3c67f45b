@@ -1,0 +1,332 @@
+---
+title: Environment Setup
+description: Configure the development and production environment for Roxas Water Billing System
+---
+
+## Server Requirements
+
+The Roxas Water Billing System requires the following server environment:
+
+### PHP Requirements
+
+- **PHP Version**: 7.4 or higher (8.0+ recommended)
+- **Required Extensions**:
+  - `mbstring` - Multibyte string processing (required for dompdf)
+  - `gd` - Image processing (required for dompdf PDF generation)
+  - `mysqli` - MySQL database connectivity
+  - `json` - JSON data handling
+  - `curl` - HTTP requests (for OAuth and email)
+  - `openssl` - Secure connections
+  - `fileinfo` - File upload handling
+
+### Database Requirements
+
+- **MySQL**: 5.7 or higher
+- **MariaDB**: 10.4+ (tested with 10.4.28)
+
+### Web Server
+
+- Apache 2.4+ or Nginx
+- Document root should point to the application root directory
+- `.htaccess` support (for Apache) or equivalent Nginx configuration
+
+## PHP Configuration
+
+<Warning>
+  The `mbstring` and `gd` extensions are **critical** for PDF generation. Without these, the dompdf library will fail to generate invoices and reports.
+</Warning>
+
+Edit your `php.ini` file to enable required extensions:
+
+```ini php.ini
+; Enable mbstring extension for multibyte string processing
+extension=mbstring
+
+; Enable GD extension for image processing and PDF generation
+extension=gd
+
+; Other recommended settings
+memory_limit = 256M
+upload_max_filesize = 10M
+post_max_size = 10M
+max_execution_time = 120
+```
+
+Restart your web server after modifying `php.ini`:
+
+```bash
+# Apache
+sudo systemctl restart apache2
+
+# Nginx with PHP-FPM
+sudo systemctl restart php-fpm
+sudo systemctl restart nginx
+```
+
+## Composer Dependencies
+
+<Steps>
+  <Step title="Install Composer">
+    Ensure Composer is installed on your system:
+
+    ```bash
+    composer --version
+    ```
+
+    If not installed, download from [getcomposer.org](https://getcomposer.org/)
+  </Step>
+
+  <Step title="Install Admin Dependencies">
+    Navigate to the admin directory and install dependencies:
+
+    ```bash
+    cd admin
+    composer install
+    ```
+
+    This installs:
+    - `dompdf/dompdf` ^2.0 - PDF generation for invoices and reports
+    - `phpmailer/phpmailer` ^6.8 - Email functionality
+    - `league/oauth2-google` ^4.0 - Google OAuth authentication
+  </Step>
+
+  <Step title="Install Cashier Dependencies">
+    ```bash
+    cd cashier
+    composer install
+    ```
+
+    Installs:
+    - `dompdf/dompdf` ^2.0
+    - `phpmailer/phpmailer` ^6.8
+    - `endroid/qr-code` ^5.0 - QR code generation for receipts
+    - `league/oauth2-google` ^4.0
+  </Step>
+
+  <Step title="Install Meter Reader Dependencies">
+    ```bash
+    cd meter-reader
+    composer install
+    ```
+
+    Installs the same dependencies as the cashier module.
+  </Step>
+</Steps>
+
+## NPM Dependencies
+
+The system uses Tailwind CSS and several JavaScript libraries for the frontend.
+
+<Steps>
+  <Step title="Install Node.js">
+    Ensure Node.js 14+ and npm are installed:
+
+    ```bash
+    node --version
+    npm --version
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    From the project root directory:
+
+    ```bash
+    npm install
+    ```
+
+    This installs:
+
+    **Production Dependencies:**
+    - `apexcharts` ^3.45.1 - Charts and data visualization
+    - `flowbite` ^1.8.1 - Tailwind CSS components
+    - `flowbite-datepicker` ^1.2.2 - Date picker component
+    - `jquery` ^3.7.1 - DOM manipulation and AJAX
+    - `validate.js` ^0.13.1 - Client-side form validation
+
+    **Development Dependencies:**
+    - `tailwindcss` ^3.3.5 - CSS framework
+    - `@tailwindcss/forms` ^0.5.3 - Form styling plugin
+  </Step>
+</Steps>
+
+### Package.json Overview
+
+```json package.json
+{
+  "name": "wbs",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "tailwindcss -i ./src/input.css -o ./assets/css/style.css --watch",
+    "format": "prettier -- ./authentication/signin.php --write",
+    "prettier": "prettier"
+  },
+  "author": "Jeffry James Paner",
+  "license": "MIT",
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.3",
+    "tailwindcss": "^3.3.5"
+  },
+  "dependencies": {
+    "apexcharts": "^3.45.1",
+    "flowbite": "^1.8.1",
+    "flowbite-datepicker": "^1.2.2",
+    "jquery": "^3.7.1",
+    "validate.js": "^0.13.1"
+  }
+}
+```
+
+## Tailwind CSS Setup
+
+The project uses Tailwind CSS with custom configuration and Flowbite components.
+
+### Tailwind Configuration
+
+```javascript tailwind.config.js
+const defaultTheme = require("tailwindcss/defaultTheme");
+
+module.exports = {
+  content: [
+    "./node_modules/flowbite/**/*.js",
+    "./authentication/**/*.{html,php,js}",
+    "./admin/**/*.{html,php,js}",
+    "./meter-reader/**/*.{html,php,js}",
+    "./cashier/**/*.{html,php,js}",
+    "./index.php",
+    "./**/*.html",
+    "./**/*.php",
+    "./**/*.js"
+  ],
+  theme: {
+    extend: {
+      screens: {
+        xs: "540px",
+        ...defaultTheme.screens,
+      },
+      colors: {
+        primary: {
+          50: "#eef2ff",
+          100: "#e0e7ff",
+          200: "#c7d2fe",
+          300: "#a5b4fc",
+          400: "#818cf8",
+          500: "#6366f1",
+          600: "#4f46e5",
+          700: "#4338ca",
+          800: "#3730a3",
+          900: "#312e81",
+          950: "#1e1b4b",
+        },
+      },
+    },
+  },
+  plugins: [
+    require('flowbite/plugin')({
+      charts: true,
+    }),
+    require('@tailwindcss/forms')
+  ],
+};
+```
+
+### Building CSS
+
+Run Tailwind in watch mode during development:
+
+```bash
+npm run dev
+```
+
+This watches `./src/input.css` and outputs to `./assets/css/style.css`.
+
+For production builds, use:
+
+```bash
+tailwindcss -i ./src/input.css -o ./assets/css/style.css --minify
+```
+
+## Directory Structure
+
+The application is organized into three main modules:
+
+```
+/
+├── admin/              # Administrator portal
+├── cashier/            # Cashier portal
+├── meter-reader/       # Meter reader portal
+├── authentication/     # Shared authentication
+├── assets/            # Global assets
+├── src/               # Tailwind source files
+├── uploads/           # User uploaded files
+└── DB_BACKUP/         # Database backups
+```
+
+## Verification
+
+Verify your environment setup:
+
+<Steps>
+  <Step title="Check PHP Extensions">
+    ```bash
+    php -m | grep -E "(mbstring|gd|mysqli|json|curl)"
+    ```
+
+    All required extensions should appear in the output.
+  </Step>
+
+  <Step title="Verify Composer Dependencies">
+    ```bash
+    composer show -i | grep -E "(dompdf|phpmailer|oauth2-google)"
+    ```
+  </Step>
+
+  <Step title="Check NPM Packages">
+    ```bash
+    npm list --depth=0
+    ```
+  </Step>
+
+  <Step title="Test Tailwind Build">
+    ```bash
+    npm run dev
+    ```
+
+    Should output: "Done in XXXms" without errors.
+  </Step>
+</Steps>
+
+## Common Issues
+
+### Missing mbstring Extension
+
+If you see errors about mbstring:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install php-mbstring
+
+# CentOS/RHEL
+sudo yum install php-mbstring
+
+# Restart Apache
+sudo systemctl restart apache2
+```
+
+### Missing GD Extension
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install php-gd
+
+# CentOS/RHEL
+sudo yum install php-gd
+```
+
+### Composer Memory Limit
+
+If Composer runs out of memory:
+
+```bash
+php -d memory_limit=-1 $(which composer) install
+```

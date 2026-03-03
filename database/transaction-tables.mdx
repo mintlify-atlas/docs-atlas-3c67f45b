@@ -1,0 +1,417 @@
+---
+title: Transaction Tables
+description: Payment transactions and logging tables schema
+icon: receipt
+---
+
+## transactions Table
+
+Records all payment transactions for both application fees and water bill payments.
+
+### Table Schema
+
+```sql
+CREATE TABLE `transactions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `transaction_id` varchar(255) NOT NULL,
+  `reference_id` varchar(255) NOT NULL,
+  `client_id` varchar(50) NOT NULL,
+  `transaction_type` enum('application_payment','bill_payment') NOT NULL,
+  `transaction_desc` text NOT NULL,
+  `amount_due` decimal(10,2) NOT NULL,
+  `amount_paid` decimal(10,2) NOT NULL,
+  `remaining_balance` decimal(10,2) DEFAULT NULL,
+  `confirmed_by` varchar(20) NOT NULL,
+  `time` time DEFAULT NULL,
+  `date` date DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `transaction_id` (`transaction_id`),
+  KEY `client_id` (`client_id`)
+) ENGINE=InnoDB;
+```
+
+### Field Descriptions
+
+<ResponseField name="id" type="int(11)">
+  Auto-incrementing primary key
+</ResponseField>
+
+<ResponseField name="transaction_id" type="varchar(255)" required>
+  Unique transaction identifier (timestamp-based)
+  
+  Example: `17059761921726`
+  
+  **Constraint:** Must be unique
+</ResponseField>
+
+<ResponseField name="reference_id" type="varchar(255)" required>
+  Reference to the record being paid
+  
+  - For `application_payment`: Application ID (e.g., `A20240123031530`)
+  - For `bill_payment`: Billing ID (e.g., `B-W-89898-1705976298`)
+</ResponseField>
+
+<ResponseField name="client_id" type="varchar(50)" required>
+  Client making the payment
+  
+  Example: `WBS-RGV-001012324`
+</ResponseField>
+
+<ResponseField name="transaction_type" type="enum" required>
+  Type of payment transaction
+  
+  **Values:**
+  - `application_payment` - Payment for new service application fees
+  - `bill_payment` - Payment for water consumption bill
+</ResponseField>
+
+<ResponseField name="transaction_desc" type="text" required>
+  Descriptive text of the transaction
+  
+  Example: `Payment received from Rogene G. Vito - Billing Month of January 2024 - Confirmed by Jeffry James Paner`
+</ResponseField>
+
+<ResponseField name="amount_due" type="decimal(10,2)" required>
+  Total amount owed before payment
+</ResponseField>
+
+<ResponseField name="amount_paid" type="decimal(10,2)" required>
+  Amount received in this transaction
+</ResponseField>
+
+<ResponseField name="remaining_balance" type="decimal(10,2)">
+  Change to be returned or credit balance
+  
+  Calculated as: `amount_paid - amount_due`
+</ResponseField>
+
+<ResponseField name="confirmed_by" type="varchar(20)" required>
+  User ID who confirmed and processed the payment
+  
+  Example: `ADMIN_05` (typically a Cashier)
+</ResponseField>
+
+<ResponseField name="time" type="time">
+  Time the transaction was recorded
+</ResponseField>
+
+<ResponseField name="date" type="date">
+  Date the transaction occurred
+</ResponseField>
+
+<ResponseField name="timestamp" type="timestamp" default="current_timestamp()">
+  Automatic record creation timestamp
+</ResponseField>
+
+### Transaction Examples
+
+**Application Payment:**
+```json
+{
+  "transaction_id": "17059761921726",
+  "reference_id": "A20240123031530",
+  "client_id": "WBS-RGV-001012324",
+  "transaction_type": "application_payment",
+  "transaction_desc": "Payment received from Rogene G. Vito - Property Type Residential - Confirmed by Jeffry James Paner",
+  "amount_due": 8527.00,
+  "amount_paid": 9000.00,
+  "remaining_balance": 473.00,
+  "confirmed_by": "ADMIN_05"
+}
+```
+
+**Bill Payment:**
+```json
+{
+  "transaction_id": "17059773752471",
+  "reference_id": "B-W-89898-1705976298",
+  "client_id": "WBS-RGV-001012324",
+  "transaction_type": "bill_payment",
+  "transaction_desc": "Payment received from Rogene G. Vito - Billing Month of January 2024 - Confirmed by Jeffry James Paner",
+  "amount_due": 825190.20,
+  "amount_paid": 900000.00,
+  "remaining_balance": 74810.00,
+  "confirmed_by": "ADMIN_05"
+}
+```
+
+---
+
+## meter_reading_logs Table
+
+Historical log of all meter readings taken by field staff.
+
+### Table Schema
+
+```sql
+CREATE TABLE `meter_reading_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `reference_id` varchar(50) NOT NULL COMMENT 'Reference to Billing ID',
+  `client_id` varchar(50) NOT NULL,
+  `meter_number` varchar(50) NOT NULL,
+  `prev_reading` decimal(10,2) NOT NULL,
+  `curr_reading` decimal(10,2) NOT NULL,
+  `consumption` decimal(10,2) NOT NULL,
+  `user_id` varchar(20) NOT NULL,
+  `reading_month` varchar(20) NOT NULL,
+  `time` time DEFAULT NULL,
+  `date` date DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `client_id` (`client_id`)
+) ENGINE=InnoDB;
+```
+
+### Field Descriptions
+
+<ResponseField name="reference_id" type="varchar(50)" required>
+  Reference to the billing_data record created from this reading
+  
+  Example: `B-W-57599-1699254522`
+</ResponseField>
+
+<ResponseField name="client_id" type="varchar(50)" required>
+  Client whose meter was read
+</ResponseField>
+
+<ResponseField name="meter_number" type="varchar(50)" required>
+  Meter that was read
+</ResponseField>
+
+<ResponseField name="prev_reading" type="decimal(10,2)" required>
+  Previous meter reading value
+</ResponseField>
+
+<ResponseField name="curr_reading" type="decimal(10,2)" required>
+  Current meter reading value
+</ResponseField>
+
+<ResponseField name="consumption" type="decimal(10,2)" required>
+  Calculated consumption (curr_reading - prev_reading)
+</ResponseField>
+
+<ResponseField name="user_id" type="varchar(20)" required>
+  Meter reader who performed the reading
+  
+  Example: `Rogene Vito`
+</ResponseField>
+
+<ResponseField name="reading_month" type="varchar(20)" required>
+  Billing month for this reading
+  
+  Example: `November 2023`
+</ResponseField>
+
+---
+
+## logs Table
+
+System activity log tracking user actions and events.
+
+### Table Schema
+
+```sql
+CREATE TABLE `logs` (
+  `id` int(55) NOT NULL AUTO_INCREMENT,
+  `log_id` varchar(50) NOT NULL,
+  `user_role` varchar(55) NOT NULL,
+  `user_name` varchar(55) NOT NULL,
+  `user_activity` text NOT NULL,
+  `client_id` int(50) NOT NULL,
+  `description` text NOT NULL,
+  `date` date DEFAULT NULL,
+  `time` time DEFAULT NULL,
+  `datetime` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB;
+```
+
+### Field Descriptions
+
+<ResponseField name="log_id" type="varchar(50)" required>
+  Unique log entry identifier
+  
+  Format varies by activity type:
+  - Sign in: `SI` + role code + user initials + timestamp
+  - Sign out: `SO` + role code + user initials + timestamp
+  
+  Example: `SIAJJP20231030064505` (Sign in, Admin, Jeffry James Paner)
+</ResponseField>
+
+<ResponseField name="user_role" type="varchar(55)" required>
+  Role of the user performing the action
+  
+  **Common values:**
+  - `Admin` - System administrator
+  - `Cashier` - Cashier staff
+  - `Meter Reader` - Field meter reading staff
+</ResponseField>
+
+<ResponseField name="user_name" type="varchar(55)" required>
+  Name of the user
+  
+  Example: `Jeffry James Paner`
+</ResponseField>
+
+<ResponseField name="user_activity" type="text" required>
+  Type of activity performed
+  
+  **Common values:**
+  - `Sign in` - User logged into system
+  - `Sign out` - User logged out
+  - Other system activities
+</ResponseField>
+
+<ResponseField name="client_id" type="int(50)" required>
+  Client ID if activity relates to a specific client (0 for non-client activities)
+</ResponseField>
+
+<ResponseField name="description" type="text" required>
+  Human-readable description of the activity
+  
+  Example: `Jeffry James Paner has been signed in.`
+</ResponseField>
+
+---
+
+## log_changes Table
+
+Audit trail of database table modifications triggered automatically.
+
+### Table Schema
+
+```sql
+CREATE TABLE `log_changes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `table_name` varchar(255) DEFAULT NULL,
+  `action` varchar(255) DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB;
+```
+
+### Field Descriptions
+
+<ResponseField name="table_name" type="varchar(255)">
+  Name of the table that was modified
+  
+  **Tracked tables:**
+  - `billing_data`
+  - `client_data`
+  - `client_application`
+</ResponseField>
+
+<ResponseField name="action" type="varchar(255)">
+  Type of database operation
+  
+  **Values:**
+  - `INSERT` - New record added
+  - `UPDATE` - Existing record modified
+</ResponseField>
+
+<ResponseField name="timestamp" type="timestamp" default="current_timestamp()">
+  When the change occurred
+</ResponseField>
+
+<Note>
+  This table is populated automatically by database triggers. It provides a simple audit trail without storing the actual changed data.
+</Note>
+
+---
+
+## email_logs Table
+
+Tracks email notifications sent to clients.
+
+### Table Schema
+
+```sql
+CREATE TABLE `email_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `client_id` varchar(50) NOT NULL,
+  `reference_id` varchar(50) NOT NULL COMMENT 'BILLING ID',
+  `sent_to` varchar(50) NOT NULL,
+  `sent_from` varchar(50) NOT NULL,
+  `user_id` varchar(50) NOT NULL,
+  `time` time NOT NULL,
+  `date` date NOT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `client_id` (`client_id`)
+) ENGINE=InnoDB;
+```
+
+### Field Descriptions
+
+<ResponseField name="client_id" type="varchar(50)" required>
+  Client who received the email
+</ResponseField>
+
+<ResponseField name="reference_id" type="varchar(50)" required>
+  Billing ID that the email relates to
+  
+  Example: `B-W-69697-1699615230`
+</ResponseField>
+
+<ResponseField name="sent_to" type="varchar(50)" required>
+  Recipient email address
+</ResponseField>
+
+<ResponseField name="sent_from" type="varchar(50)" required>
+  Sender email address
+  
+  Typically: `roxaswaterbillingsystem@gmail.com`
+</ResponseField>
+
+<ResponseField name="user_id" type="varchar(50)" required>
+  User who triggered the email send
+  
+  Example: `ADMIN_02`
+</ResponseField>
+
+---
+
+## generated_billing_logs Table
+
+Tracks generated billing documents (PDF files).
+
+### Table Schema
+
+```sql
+CREATE TABLE `generated_billing_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `billing_month` varchar(20) NOT NULL,
+  `filename` text NOT NULL,
+  `filepath` text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `user_id` varchar(50) NOT NULL,
+  `time` time NOT NULL,
+  `date` date NOT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB;
+```
+
+### Field Descriptions
+
+<ResponseField name="billing_month" type="varchar(20)" required>
+  Billing period for the generated document
+  
+  Example: `April 2024`
+</ResponseField>
+
+<ResponseField name="filename" type="text" required>
+  Name of the generated file
+  
+  Example: `2024APR.pdf`
+</ResponseField>
+
+<ResponseField name="filepath" type="text" required>
+  Relative path to the generated file
+  
+  Example: `temp/all_billing/2024APR.pdf`
+</ResponseField>
+
+<ResponseField name="user_id" type="varchar(50)" required>
+  User who generated the billing document
+</ResponseField>

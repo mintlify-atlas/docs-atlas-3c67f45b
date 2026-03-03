@@ -1,0 +1,501 @@
+---
+title: Email integration
+description: Sending emails with PHPMailer and OAuth2 authentication
+---
+
+The Roxas Water Billing System uses PHPMailer with Google OAuth2 for sending emails, including approval notifications, billing statements, and receipts.
+
+## PHPMailer integration
+
+### Installation
+
+PHPMailer and OAuth2 client are installed via Composer:
+
+```json composer.json
+{
+  "require": {
+    "phpmailer/phpmailer": "^6.8",
+    "league/oauth2-google": "^4.0"
+  }
+}
+```
+
+### Dependencies
+
+```php
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+use League\OAuth2\Client\Provider\Google;
+```
+
+## WBSMailer class
+
+The system uses a `WBSMailer` class that extends `PdfGenerator`:
+
+```php database_queries.php
+class WBSMailer extends PdfGenerator
+{
+    public function handleEmailSend($mailData, $filepath)
+    {
+        // Validate required fields
+        $requiredFields = ['email', 'first_name', 'last_name'];
+        foreach ($requiredFields as $field) {
+            if (empty($mailData[$field])) {
+                return "Error: Field '{$field}' is missing from client data.";
+            }
+        }
+        
+        // Validate file exists
+        if (!file_exists($filepath) || !is_readable($filepath)) {
+            return "Error: The file at {$filepath} does not exist or is not readable.";
+        }
+        
+        $email = $mailData['email'];
+        $firstName = $mailData['first_name'];
+        $lastName = $mailData['last_name'];
+        $sender = 'roxaswaterbillingsystem@gmail.com';
+        
+        try {
+            // Load OAuth2 credentials
+            $credentials = json_decode(
+                file_get_contents('config/credentials.json'), 
+                true
+            );
+            
+            $provider = new Google([
+                'clientId'     => $credentials['clientId'],
+                'clientSecret' => $credentials['clientSecret'],
+                'redirectUri'  => $credentials['redirectUri'],
+            ]);
+            
+            // Configure PHPMailer
+            $mail = new PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host = 'smtp.gmail.com';
+            $mail->SMTPAuth = true;
+            $mail->Username = $sender;
+            $mail->Password = 'sluzmpnriimiseul'; // App password
+            $mail->Port = 465;
+            $mail->SMTPSecure = "ssl";
+            
+            // Set sender and recipient
+            $mail->setFrom($sender, 'Roxas Water Billing System Inc.');
+            $mail->addAddress($email, $firstName . ' ' . $lastName);
+            
+            // Attach PDF
+            $mail->addAttachment($filepath);
+            
+            // Email content
+            $mail->isHTML(true);
+            $mail->Subject = 'Your Copy of Certificate of Registration';
+            $mail->Body = 'Please find your certificate attached.';
+            
+            // Send email
+            $mail->send();
+            $mail->smtpClose();
+            
+            return 'Message has been sent';
+            
+        } catch (Exception $e) {
+            error_log($e->getMessage());
+            return 'An error occurred while sending the email. Please try again later.';
+        }
+    }
+}
+```
+
+<Warning>
+Store the actual app password in `credentials.json` or environment variables, not hardcoded in the source code.
+</Warning>
+
+## Email types
+
+The system sends different types of emails:
+
+<CardGroup cols={2}>
+  <Card title="Application approval" icon="check-circle">
+    Sent when admin approves client application with registration certificate
+  </Card>
+  <Card title="Billing statement" icon="file-invoice">
+    Sent monthly with PDF billing statement attached
+  </Card>
+  <Card title="Payment receipt" icon="receipt">
+    Sent after payment confirmation with invoice
+  </Card>
+  <Card title="Disconnection notice" icon="triangle-exclamation">
+    Sent for overdue accounts
+  </Card>
+</CardGroup>
+
+## Email templates
+
+HTML email templates provide professional formatting:
+
+### Approval email template
+
+```html templates/approval-email-template.html
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+        }
+        .header {
+            background-color: #4338ca;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .content {
+            padding: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4338ca;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .footer {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Application Approved</h1>
+        </div>
+        <div class="content">
+            <p>Dear {{ client_name }},</p>
+            
+            <p>We are pleased to inform you that your application has been approved!</p>
+            
+            <p><strong>Your Details:</strong></p>
+            <ul>
+                <li><strong>Client ID:</strong> {{ client_id }}</li>
+                <li><strong>Registration ID:</strong> {{ reg_id }}</li>
+                <li><strong>Meter Number:</strong> {{ meter_number }}</li>
+            </ul>
+            
+            <p>Your Certificate of Registration is attached to this email.</p>
+            
+            <p>Thank you for choosing Roxas Water District.</p>
+        </div>
+        <div class="footer">
+            <p>Roxas Water Billing System Inc.<br>
+            Email: roxaswaterbillingsystem@gmail.com</p>
+        </div>
+    </div>
+</body>
+</html>
+```
+
+### Using email templates
+
+```php
+public function sendApprovalEmail($clientData, $pdfPath)
+{
+    // Load template
+    $html = file_get_contents('./templates/approval-email-template.html');
+    
+    // Replace placeholders
+    $html = str_replace(
+        [
+            '{{ client_name }}',
+            '{{ client_id }}',
+            '{{ reg_id }}',
+            '{{ meter_number }}'
+        ],
+        [
+            $clientData['full_name'],
+            $clientData['client_id'],
+            $clientData['reg_id'],
+            $clientData['meter_number']
+        ],
+        $html
+    );
+    
+    // Send email with template
+    $mail = new PHPMailer(true);
+    // ... SMTP configuration ...
+    $mail->Subject = 'Your Application Has Been Approved';
+    $mail->Body = $html;
+    $mail->addAttachment($pdfPath);
+    $mail->send();
+}
+```
+
+## Google OAuth2 setup
+
+### Credentials file
+
+Store OAuth2 credentials in `config/credentials.json`:
+
+```json credentials.json
+{
+  "clientId": "your-client-id.apps.googleusercontent.com",
+  "clientSecret": "your-client-secret",
+  "redirectUri": "http://localhost/oauth2callback"
+}
+```
+
+<Info>
+Obtain OAuth2 credentials from [Google Cloud Console](https://console.cloud.google.com/) by creating an OAuth 2.0 Client ID.
+</Info>
+
+### App password setup
+
+For Gmail SMTP without OAuth2:
+
+<Steps>
+  <Step title="Enable 2-Factor Authentication">
+    Go to Google Account Security settings and enable 2FA
+  </Step>
+  
+  <Step title="Generate App Password">
+    Navigate to Security → App passwords
+    
+    Generate a new app password for "Mail"
+  </Step>
+  
+  <Step title="Use App Password">
+    Use the 16-character password in PHPMailer:
+    
+    ```php
+    $mail->Password = 'your-16-char-app-password';
+    ```
+  </Step>
+</Steps>
+
+## SMTP configuration
+
+### Gmail SMTP settings
+
+```php
+$mail->isSMTP();
+$mail->Host = 'smtp.gmail.com';
+$mail->SMTPAuth = true;
+$mail->Username = 'your-email@gmail.com';
+$mail->Password = 'your-app-password';
+$mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // or 'ssl'
+$mail->Port = 465; // or 587 for TLS
+```
+
+### Alternative SMTP providers
+
+<Tabs>
+  <Tab title="Gmail">
+    ```php
+    $mail->Host = 'smtp.gmail.com';
+    $mail->Port = 465; // SSL
+    // or Port = 587; // TLS
+    ```
+  </Tab>
+  
+  <Tab title="Outlook">
+    ```php
+    $mail->Host = 'smtp-mail.outlook.com';
+    $mail->Port = 587;
+    $mail->SMTPSecure = 'tls';
+    ```
+  </Tab>
+  
+  <Tab title="Yahoo">
+    ```php
+    $mail->Host = 'smtp.mail.yahoo.com';
+    $mail->Port = 465;
+    $mail->SMTPSecure = 'ssl';
+    ```
+  </Tab>
+  
+  <Tab title="Custom SMTP">
+    ```php
+    $mail->Host = 'smtp.yourdomain.com';
+    $mail->Port = 587;
+    $mail->SMTPSecure = 'tls';
+    ```
+  </Tab>
+</Tabs>
+
+## Email logging
+
+Emails are logged in the `email_logs` table:
+
+```sql
+CREATE TABLE email_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    recipient_email VARCHAR(255),
+    subject VARCHAR(255),
+    status ENUM('sent', 'failed'),
+    error_message TEXT,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Logging email activity
+
+```php
+public function logEmail($recipientEmail, $subject, $status, $error = null)
+{
+    $sql = "INSERT INTO email_logs 
+            (recipient_email, subject, status, error_message) 
+            VALUES (?, ?, ?, ?)";
+    
+    $stmt = $this->conn->prepareStatement($sql);
+    mysqli_stmt_bind_param($stmt, "ssss", 
+        $recipientEmail, 
+        $subject, 
+        $status, 
+        $error
+    );
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
+}
+
+// Usage
+try {
+    $mail->send();
+    $this->logEmail($email, $subject, 'sent');
+} catch (Exception $e) {
+    $this->logEmail($email, $subject, 'failed', $e->getMessage());
+}
+```
+
+## Bulk email sending
+
+For sending billing statements to multiple clients:
+
+```php
+public function sendBulkBillingEmails($clientsArray)
+{
+    $mail = new PHPMailer(true);
+    // Configure SMTP once
+    $this->configureSMTP($mail);
+    
+    foreach ($clientsArray as $client) {
+        try {
+            // Clear previous recipients
+            $mail->clearAddresses();
+            $mail->clearAttachments();
+            
+            // Set recipient
+            $mail->addAddress($client['email'], $client['full_name']);
+            
+            // Generate and attach PDF
+            $pdfPath = $this->generateBillingPdf($client['billing_id']);
+            $mail->addAttachment($pdfPath);
+            
+            // Customize email
+            $mail->Subject = "Water Bill for " . $client['billing_month'];
+            $mail->Body = $this->getBillingEmailBody($client);
+            
+            // Send
+            $mail->send();
+            
+            // Log success
+            $this->logEmail($client['email'], $mail->Subject, 'sent');
+            
+            // Delay to avoid rate limiting
+            sleep(1);
+            
+        } catch (Exception $e) {
+            // Log failure
+            $this->logEmail($client['email'], $mail->Subject, 'failed', $e->getMessage());
+            continue;
+        }
+    }
+    
+    $mail->smtpClose();
+}
+```
+
+<Warning>
+When sending bulk emails, implement rate limiting and error handling to avoid SMTP server restrictions.
+</Warning>
+
+## Troubleshooting
+
+<Accordion title="SMTP Authentication Failed">
+**Problem:** "SMTP Error: Could not authenticate"
+
+**Solutions:**
+- Verify username and password are correct
+- Use app password instead of account password
+- Enable "Less secure app access" (not recommended)
+- Check 2-Factor Authentication is enabled
+</Accordion>
+
+<Accordion title="Connection Timeout">
+**Problem:** "SMTP connect() failed"
+
+**Solutions:**
+- Check firewall allows outbound connections on port 465/587
+- Verify SMTP host and port are correct
+- Try alternative port (465 vs 587)
+- Enable `SMTPDebug` for detailed logs:
+  ```php
+  $mail->SMTPDebug = 2;
+  ```
+</Accordion>
+
+<Accordion title="Attachment Too Large">
+**Problem:** "Message size exceeds maximum"
+
+**Solutions:**
+- Reduce PDF file size
+- Compress images in PDF templates
+- Split large attachments
+- Check SMTP server limits
+</Accordion>
+
+## Best practices
+
+<Note>
+**Security**
+- Never commit credentials to version control
+- Use environment variables or config files
+- Implement rate limiting for bulk emails
+- Sanitize email addresses before sending
+</Note>
+
+<Note>
+**Performance**
+- Reuse SMTP connections for bulk sending
+- Implement queue system for large volumes
+- Use background jobs for email sending
+- Cache email templates
+</Note>
+
+<Note>
+**Deliverability**
+- Use proper sender name and email
+- Include plain text alternative
+- Test emails before bulk sending
+- Monitor bounce rates
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="PDF generation" icon="file-pdf" href="/development/pdf-generation">
+    Creating email attachments
+  </Card>
+  <Card title="Database queries" icon="database" href="/development/database-queries">
+    Fetching recipient data
+  </Card>
+</CardGroup>

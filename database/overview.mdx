@@ -1,0 +1,150 @@
+---
+title: Database Overview
+description: Overview of the Roxas Water Billing System database schema
+icon: database
+---
+
+## Database Information
+
+**Database Name:** `wbs_db`
+
+**Database Engine:** MariaDB 10.4.28
+
+**Character Set:** utf8mb4
+
+## Database Structure
+
+The Roxas Water Billing System uses a relational database with the following main table groups:
+
+### Client Management Tables
+
+- **client_application** - Stores new water service applications from customers
+- **client_data** - Active client information with registration details
+- **client_secondary_data** - Additional client demographic and documentation data
+- **client_application_fees** - Fee structures for new applications
+- **address** - Barangay (neighborhood) master data
+- **clients_archive** - Archived client records
+
+### Billing Tables
+
+- **billing_data** - Core billing records with meter readings and amounts
+- **billing_cycle** - Billing period configuration and status
+- **rates** - Water rate configurations per property type
+- **penalty_fees** - Late payment and reconnection fee settings
+- **penalty_logs** - Applied penalty records
+
+### Transaction Tables
+
+- **transactions** - Payment transactions for bills and applications
+- **temp__receipt** - Temporary receipt generation data
+
+### Operational Tables
+
+- **meter_reading_logs** - Historical meter reading records
+- **meter_reports** - Meter issues and anomalies reported by field staff
+- **email_logs** - Email notification history
+- **generated_billing_logs** - Generated billing document logs
+
+### System Tables
+
+- **users** - System user accounts (admin, cashier, meter readers)
+- **user_id** - Auto-increment helper for user ID generation
+- **logs** - User activity and system event logs
+- **log_changes** - Database change tracking (via triggers)
+- **notifications** - In-app notifications for staff
+
+## Key Relationships
+
+### Client Registration Flow
+
+```
+client_application → client_data → billing_data
+       ↓
+client_application_fees
+       ↓
+   transactions
+```
+
+1. Customer submits application (`client_application`)
+2. Application fees are recorded (`client_application_fees`)
+3. Payment is confirmed (`transactions`)
+4. Client is activated in system (`client_data`)
+5. Initial billing record created (`billing_data`)
+
+### Billing Cycle Flow
+
+```
+billing_cycle → billing_data → rates
+                      ↓
+               penalty_fees
+                      ↓
+                transactions
+```
+
+1. Billing cycle is started (`billing_cycle`)
+2. Meter readings are recorded (`meter_reading_logs`)
+3. Bills are generated (`billing_data`) using configured rates
+4. Penalties applied for late payments (`penalty_logs`)
+5. Payments recorded (`transactions`)
+
+### Reference Keys
+
+<ResponseField name="client_id" type="varchar(20)">
+  Unique client identifier format: `WBS-XXX-NNNDMMYY`
+  - XXX: Initials from name
+  - NNN: Sequence number
+  - DDMMYY: Registration date
+</ResponseField>
+
+<ResponseField name="meter_number" type="varchar(50)">
+  Water meter identifier format: `W-NNNNN`
+</ResponseField>
+
+<ResponseField name="billing_id" type="varchar(50)">
+  Unique billing record identifier format: `B-W-NNNNN-TIMESTAMP`
+</ResponseField>
+
+<ResponseField name="application_id" type="varchar(50)">
+  Application identifier format: `A` followed by alphanumeric code
+</ResponseField>
+
+## Database Triggers
+
+The system uses database triggers to maintain audit logs:
+
+### Change Tracking Triggers
+
+- `billing_data_after_insert` - Logs new billing records
+- `billing_data_after_update` - Logs billing updates
+- `client_data_after_insert` - Logs new client registrations
+- `client_data_after_update` - Logs client data changes
+- `client_application_after_insert` - Logs new applications
+- `client_application_after_update` - Logs application updates
+
+### User ID Generation
+
+- `users` (BEFORE INSERT) - Auto-generates user_id in format `ADMIN_NN`
+
+## Data Integrity
+
+The database maintains referential integrity through:
+
+- **Primary Keys** on all tables
+- **Indexes** on frequently queried columns (client_id, meter_number, billing_id)
+- **Unique Constraints** on email addresses
+- **ENUM types** for status fields to ensure valid values
+- **Foreign Key Indexes** for relationship navigation
+
+## Backup Information
+
+Database backups are generated automatically at regular intervals. Backup files are stored in the format:
+
+```
+wbs_db_backup-YYYY-MM-DD_HH-MM-SS.sql
+```
+
+Backup files include:
+- Complete table structures
+- All data
+- Trigger definitions
+- Index definitions

@@ -1,0 +1,603 @@
+---
+title: Reports & Analytics
+description: Dashboard analytics, charts, and revenue reports in the Roxas Water Billing System
+---
+
+The analytics dashboard provides comprehensive insights into system operations, revenue, client statistics, and water consumption patterns.
+
+## Dashboard Overview
+
+The main admin dashboard (`admin/dashboard.php`) displays real-time analytics and key performance indicators.
+
+<CardGroup cols={2}>
+  <Card title="Total Clients" icon="users">
+    Track active, inactive, and under review clients
+  </Card>
+  
+  <Card title="Total Revenue" icon="dollar-sign">
+    Monitor revenue from application fees and bill payments
+  </Card>
+  
+  <Card title="Total Applications" icon="file-lines">
+    View application statistics by status
+  </Card>
+  
+  <Card title="Total Consumption" icon="droplet">
+    Analyze water usage by property type
+  </Card>
+</CardGroup>
+
+## Key Performance Indicators
+
+The dashboard displays four primary KPI cards powered by the `charts_data.php` API:
+
+<Tabs>
+  <Tab title="Client Statistics">
+    **Total Clients Breakdown**
+    
+    <CodeGroup>
+    ```php admin/components/dashboard_main.php
+    <div class="col-span-12 md:col-span-3 bg-white shadow-sm p-4 rounded-md">
+      <h2 class="font-semibold text-gray-500 text-lg">Total Clients</h2>
+      <h1 id="total_clients" class="font-bold text-3xl"></h1>
+      
+      <div class="flex justify-between items-center gap-2 w-full text-lg">
+        <p><span class="text-gray-600">Active: </span>
+           <span id="active_clients" class="font-semibold text-green-400"></span></p>
+        <p><span class="text-gray-600">Inactive: </span>
+           <span id="inactive_clients" class="font-semibold text-red-400"></span></p>
+        <p><span class="text-gray-600">Under Review: </span>
+           <span id="under_review_clients" class="font-semibold text-yellow-400"></span></p>
+      </div>
+    </div>
+    ```
+    </CodeGroup>
+    
+    **Data Calculation:**
+    <CodeGroup>
+    ```php admin/charts_data.php
+    function countClientsByStatus($conn, $status) {
+      $validStatuses = ['active', 'inactive'];
+      if (!in_array($status, $validStatuses)) {
+        return false;
+      }
+      
+      $sql = "SELECT COUNT(*) AS totalClients FROM client_data 
+              WHERE status = '$status'";
+      $result = $conn->query($sql);
+      
+      if ($result !== false) {
+        $row = $result->fetch_assoc();
+        return $row['totalClients'];
+      }
+    }
+    ```
+    </CodeGroup>
+  </Tab>
+  
+  <Tab title="Revenue Statistics">
+    **Total Revenue Breakdown**
+    
+    Displays revenue from:
+    - Application payments
+    - Bill payments
+    - Total combined revenue
+    
+    <CodeGroup>
+    ```php admin/components/dashboard_main.php
+    <div class="col-span-12 md:col-span-3 bg-white shadow-sm p-4 rounded-md">
+      <h2 class="font-semibold text-gray-500 text-lg">Total Revenue</h2>
+      <h1 id="total_revenue" class="font-bold text-3xl"></h1>
+      
+      <div class="flex justify-between items-center gap-2 w-full">
+        <p><span class="text-gray-500">Application: </span>
+           <span id="application_rev" class="font-semibold">6969</span></p>
+        <p><span class="text-gray-500">Billing: </span>
+           <span id="billing_rev" class="font-semibold">6969</span></p>
+      </div>
+    </div>
+    ```
+    </CodeGroup>
+    
+    **Data Calculation:**
+    <CodeGroup>
+    ```php admin/charts_data.php
+    function countRevenue($conn, $type) {
+      $validTypes = ['application_payment', 'bill_payment'];
+      if (!in_array($type, $validTypes)) {
+        return false;
+      }
+      
+      $sql = "SELECT SUM(amount_due) AS totalAmountPaid 
+              FROM transactions 
+              WHERE transaction_type = '$type'";
+      $result = $conn->query($sql);
+      
+      if ($result !== false) {
+        $row = $result->fetch_assoc();
+        return $row['totalAmountPaid'];
+      }
+    }
+    ```
+    </CodeGroup>
+  </Tab>
+  
+  <Tab title="Application Statistics">
+    **Total Applications Breakdown**
+    
+    Shows applications by status:
+    - Unconfirmed (awaiting payment)
+    - Confirmed (payment received)
+    - Approved (fully processed)
+    
+    <CodeGroup>
+    ```php admin/charts_data.php
+    function countApplication($conn, $status) {
+      $validStatuses = ['confirmed', 'unconfirmed', 'approved'];
+      if (!in_array($status, $validStatuses)) {
+        return false;
+      }
+      
+      $sql = "SELECT COUNT(*) AS totalApplications 
+              FROM client_application 
+              WHERE status = '$status'";
+      $result = $conn->query($sql);
+      
+      if ($result) {
+        $row = mysqli_fetch_assoc($result);
+        return $row['totalApplications'];
+      }
+    }
+    ```
+    </CodeGroup>
+  </Tab>
+  
+  <Tab title="Consumption Statistics">
+    **Total Water Consumption**
+    
+    Displays consumption in cubic meters (m³) by:
+    - Commercial properties
+    - Residential properties
+    - Combined total
+    
+    <CodeGroup>
+    ```php admin/components/dashboard_main.php
+    <div class="col-span-12 md:col-span-3 bg-white shadow-sm p-4 rounded-md">
+      <h2 class="font-semibold text-gray-500 text-lg">Total Consumption</h2>
+      <div class="py-5 flex gap-2 items-end">
+        <h1 id="total_consumption" class="font-bold text-3xl">10000</h1>
+        <h1 class="text-2xl text-gray-300">m³</h1>
+      </div>
+      
+      <div class="flex justify-between items-center gap-2 w-full">
+        <p><span class="text-gray-500">Commercial: </span>
+           <span id="commercial_consumption" class="font-semibold">6969</span></p>
+        <p><span class="text-gray-500">Residential: </span>
+           <span id="residential_consumption" class="font-semibold">6969</span></p>
+      </div>
+    </div>
+    ```
+    </CodeGroup>
+    
+    **Data Calculation:**
+    <CodeGroup>
+    ```php admin/charts_data.php
+    function sumConsumption($conn, $rateType) {
+      $validRateTypes = ['Commercial', 'Residential'];
+      
+      if (!in_array($rateType, $validRateTypes)) {
+        return false;
+      }
+      
+      $sql = "SELECT SUM(consumption) AS totalConsumption 
+              FROM billing_data 
+              WHERE rate_type = '$rateType'";
+      
+      $result = $conn->query($sql);
+      
+      if ($result !== false) {
+        $row = $result->fetch_assoc();
+        return $row['totalConsumption'];
+      }
+    }
+    ```
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+## Analytics Charts
+
+The dashboard includes three interactive charts for data visualization:
+
+### 1. Client Distribution Pie Chart
+
+**Purpose:** Visualize percentage of clients per barangay
+
+<CodeGroup>
+```php admin/components/dashboard_main.php
+<div class="col-span-12 xl:col-span-6 shadow-sm bg-white">
+  <div class="p-4 mb-4 flex flex-row gap-2 items-start pb-4 border-b border-gray-200">
+    <div class="p-2 h-full rounded-md outline-gray-200 bg-gray-100">
+      <svg><!-- Users icon --></svg>
+    </div>
+    <span class="flex flex-col gap-1">
+      <h1 class="text-xl font-bold text-gray-500">Clients</h1>
+      <h5 class="text-gray-400">Percentage of clients per barangay.</h5>
+    </span>
+  </div>
+  <div id="pie-chart" class="p-4 flex justify-center items-center h-full"></div>
+</div>
+```
+
+```php admin/charts_data.php
+function getClients($conn) {
+  $query = "SELECT brgy,
+                   COUNT(*) AS total_clients
+            FROM client_data
+            GROUP BY brgy
+            ORDER BY brgy";
+  
+  $result = $conn->query($query);
+  
+  $clientsData = [];
+  while ($row = $result->fetch_assoc()) {
+    $clientsData[] = [
+      'brgy' => $row['brgy'],
+      'totalClients' => $row['total_clients'],
+    ];
+  }
+  
+  return $clientsData;
+}
+```
+</CodeGroup>
+
+**Chart Shows:**
+- Distribution of clients across different barangays
+- Percentage breakdown
+- Color-coded segments for each barangay
+
+### 2. Revenue Bar Chart
+
+**Purpose:** Track revenue trends over time by transaction type
+
+<CodeGroup>
+```php admin/components/dashboard_main.php
+<div class="col-span-12 xl:col-span-6 shadow-sm bg-white">
+  <div class="p-4 mb-4 flex flex-row gap-2 items-start pb-4 border-b border-gray-200">
+    <div class="p-2 h-full rounded-md outline-gray-200 bg-gray-100">
+      <svg><!-- Database icon --></svg>
+    </div>
+    <span class="flex flex-col gap-1">
+      <h1 class="text-xl font-bold text-gray-500">Revenue</h1>
+      <h5 class="text-gray-400">Revenue generated by the system.</h5>
+    </span>
+  </div>
+  <div id="barchart" class="p-4"></div>
+</div>
+```
+
+```php admin/charts_data.php
+function getRevenue($conn) {
+  $query = "SELECT DATE_FORMAT(date, '%Y-%m') AS month,
+                   transaction_type,
+                   SUM(amount_due) AS total_revenue
+            FROM transactions
+            GROUP BY month, transaction_type
+            ORDER BY month ASC, transaction_type";
+  
+  $result = $conn->query($query);
+  
+  $revenueData = [];
+  while ($row = mysqli_fetch_assoc($result)) {
+    $revenueData[] = [
+      'month' => $row['month'],
+      'transactionType' => $row['transaction_type'],
+      'totalRevenue' => $row['total_revenue'],
+    ];
+  }
+  return $revenueData;
+}
+```
+</CodeGroup>
+
+**Chart Shows:**
+- Monthly revenue trends
+- Separated by application_payment and bill_payment
+- Historical comparison
+- Growth patterns
+
+### 3. Consumption Line Chart
+
+**Purpose:** Display water consumption trends over time
+
+<CodeGroup>
+```php admin/components/dashboard_main.php
+<div class="mt-5 col-span-12 xl:col-span-6 shadow-sm bg-white">
+  <div class="p-4 mb-4 flex flex-row gap-2 items-start pb-4 border-b border-gray-200">
+    <div class="p-2 h-full rounded-md outline-gray-200 bg-gray-100">
+      <svg><!-- Water droplet icon --></svg>
+    </div>
+    <span class="flex flex-col gap-1">
+      <h1 class="text-xl font-bold text-gray-500">Consumption</h1>
+      <h5 class="text-gray-400">Consumption trends based on monthly usage.</h5>
+    </span>
+  </div>
+  <div id="line-chart" class="p-4"></div>
+</div>
+```
+
+```php admin/charts_data.php
+function getConsumption($conn) {
+  $query = "SELECT DATE_FORMAT(date, '%Y-%m') AS month,
+                   SUM(consumption) AS total_consumption
+            FROM billing_data
+            GROUP BY month
+            ORDER BY month ASC";
+  
+  $result = $conn->query($query);
+  
+  $consumptionData = [];
+  while ($row = $result->fetch_assoc()) {
+    $consumptionData[] = [
+      'month' => $row['month'],
+      'totalConsumption' => $row['total_consumption'],
+    ];
+  }
+  return $consumptionData;
+}
+```
+</CodeGroup>
+
+**Chart Shows:**
+- Monthly water consumption in m³
+- Trend lines showing usage patterns
+- Seasonal variations
+- Anomalies or spikes
+
+## Data API Endpoints
+
+The `charts_data.php` file provides JSON API endpoints for fetching analytics data:
+
+<CodeGroup>
+```php admin/charts_data.php
+if (isset($_POST['action'])) {
+  $action = $_POST['action'];
+  
+  if ($action == 'getChartsData') {
+    // Returns all KPI data in one response
+    $generatedData = generateChartData($conn);
+    echo json_encode($generatedData);
+  } 
+  elseif ($action == 'getRevenue') {
+    // Returns revenue data for bar chart
+    $getRevenue = getRevenue($conn);
+    echo json_encode($getRevenue);
+  } 
+  elseif ($action == 'getClients') {
+    // Returns client distribution for pie chart
+    $getClients = getClients($conn);
+    echo json_encode($getClients);
+  } 
+  elseif ($action == 'getConsumption') {
+    // Returns consumption data for line chart
+    $getConsumption = getConsumption($conn);
+    echo json_encode($getConsumption);
+  }
+}
+```
+</CodeGroup>
+
+### generateChartData Response
+
+The main data endpoint returns a comprehensive JSON object:
+
+<CodeGroup>
+```php admin/charts_data.php
+function generateChartData($conn) {
+  $activeClients = (float) countClientsByStatus($conn, 'active');
+  $inactiveClients = (float) countClientsByStatus($conn, 'inactive');
+  $underReviewClients = (float) countClientsByStatus($conn, 'under_review');
+  
+  $totalClients = (float) ($activeClients + $inactiveClients);
+  
+  $applicationRevenue = (float) countRevenue($conn, 'application_payment');
+  $billingRevenue = (float) countRevenue($conn, 'bill_payment');
+  
+  $totalRevenue = (float) ($applicationRevenue + $billingRevenue);
+  
+  $unconfirmedApps = (float) countApplication($conn, 'unconfirmed');
+  $confirmedApps = (float) countApplication($conn, 'confirmed');
+  $approvedApps = (float) countApplication($conn, 'approved');
+  
+  $totalApplications = (float) ($unconfirmedApps + $confirmedApps + $approvedApps);
+  
+  $residentialConsumption = (float) sumConsumption($conn, 'Residential');
+  $commercialConsumption = (float) sumConsumption($conn, 'Commercial');
+  
+  $totalConsumption = (float) ($residentialConsumption + $commercialConsumption);
+  
+  $response = array(
+    'active' => $activeClients,
+    'inactive' => $inactiveClients,
+    'under_review' => $underReviewClients,
+    'total_clients' => $totalClients,
+    'application_rev' => $applicationRevenue,
+    'billing_rev' => $billingRevenue,
+    'total_rev' => $totalRevenue,
+    'unconfirmed_app' => $unconfirmedApps,
+    'confirmed_app' => $confirmedApps,
+    'approved_app' => $approvedApps,
+    'total_application' => $totalApplications,
+    'residential_consumption' => $residentialConsumption,
+    'commercial_consumption' => $commercialConsumption,
+    'total_consumption' => $totalConsumption
+  );
+  
+  return $response;
+}
+```
+</CodeGroup>
+
+## Report Generation
+
+Various reports can be generated from the analytics data:
+
+<CardGroup cols={2}>
+  <Card title="Revenue Reports" icon="file-invoice-dollar">
+    **Available Reports:**
+    - Daily collection summary
+    - Monthly revenue breakdown
+    - Annual revenue trends
+    - Payment method analysis
+    - Cashier performance
+  </Card>
+  
+  <Card title="Client Reports" icon="users">
+    **Available Reports:**
+    - New client registrations
+    - Client status distribution
+    - Geographic distribution
+    - Property type breakdown
+    - Inactive client analysis
+  </Card>
+  
+  <Card title="Consumption Reports" icon="chart-line">
+    **Available Reports:**
+    - Average consumption per property type
+    - High consumption clients
+    - Seasonal trends
+    - Conservation metrics
+    - Leak detection alerts
+  </Card>
+  
+  <Card title="Billing Reports" icon="file-lines">
+    **Available Reports:**
+    - Outstanding balances
+    - Overdue accounts
+    - Payment collection rate
+    - Penalty assessment
+    - Disconnection notices
+  </Card>
+</CardGroup>
+
+## Usage Patterns Analysis
+
+The system enables analysis of water usage patterns:
+
+<Steps>
+  <Step title="Identify Trends">
+    Analyze consumption data to identify:
+    - Seasonal variations (summer vs rainy season)
+    - Day of week patterns
+    - Holiday impacts
+    - Economic factors
+  </Step>
+  
+  <Step title="Detect Anomalies">
+    Flag unusual patterns:
+    - Sudden consumption spikes (possible leaks)
+    - Prolonged zero consumption (vacant properties)
+    - Irregular billing patterns
+  </Step>
+  
+  <Step title="Forecast Demand">
+    Use historical data to predict:
+    - Future water demand
+    - Infrastructure needs
+    - Revenue projections
+    - Resource allocation
+  </Step>
+  
+  <Step title="Optimize Operations">
+    Make data-driven decisions on:
+    - Reading schedules
+    - Billing cycles
+    - Rate adjustments
+    - Service improvements
+  </Step>
+</Steps>
+
+## Data Filtering
+
+Reports and analytics support various filtering options:
+
+<Tabs>
+  <Tab title="Date Range">
+    Filter by:
+    - Custom date range
+    - This month
+    - Last month
+    - This quarter
+    - This year
+    - Last year
+  </Tab>
+  
+  <Tab title="Client Type">
+    Filter by:
+    - Property type (Residential/Commercial)
+    - Client status (Active/Inactive)
+    - Barangay
+    - Payment status
+  </Tab>
+  
+  <Tab title="Transaction Type">
+    Filter by:
+    - Bill payments only
+    - Application fees only
+    - All transactions
+    - Payment method
+    - Cashier
+  </Tab>
+</Tabs>
+
+<Info>
+Date range filtering is implemented using the `date_range_scripts.php` component, which provides a consistent date picker interface across all report pages.
+</Info>
+
+## Export Capabilities
+
+Analytics and reports can be exported in various formats:
+
+- **PDF**: For printing and archival
+- **CSV**: For spreadsheet analysis
+- **Excel**: For advanced data manipulation
+- **JSON**: For API integration
+
+<Warning>
+Large data exports (>10,000 records) may take several minutes to generate. The system will display a loading indicator during export.
+</Warning>
+
+## Real-Time Updates
+
+Dashboard metrics update in real-time as new transactions occur:
+
+- Client counts update when applications are approved
+- Revenue totals update when payments are confirmed
+- Consumption totals update when bills are generated
+- Charts refresh automatically when new data is available
+
+## Performance Optimization
+
+The analytics system is optimized for performance:
+
+- **Database Indexing**: Key fields indexed for fast queries
+- **Caching**: Frequently accessed data cached
+- **Aggregation**: Pre-calculated summaries for common queries
+- **Pagination**: Large datasets paginated for faster loading
+
+<Info>
+The `charts_data.php` API uses optimized SQL queries with proper indexing to ensure dashboard loads quickly even with large datasets.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Client Management" icon="users" href="/features/client-management">
+    Learn how client data feeds into analytics
+  </Card>
+  
+  <Card title="Billing System" icon="file-invoice-dollar" href="/features/billing-system">
+    Understand how billing data is generated
+  </Card>
+</CardGroup>

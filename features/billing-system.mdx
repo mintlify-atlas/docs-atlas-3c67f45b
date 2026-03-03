@@ -1,0 +1,370 @@
+---
+title: Billing System
+description: Billing cycle creation, consumption calculation, and rate management in Roxas Water Billing System
+---
+
+The billing system automatically calculates water consumption charges based on meter readings and applies appropriate rates based on property type.
+
+## Billing Cycle Overview
+
+Billing cycles are created monthly for all active clients with verified meter readings.
+
+<Steps>
+  <Step title="Meter Reading Collection">
+    Meter readers collect current readings from all active clients during the billing period.
+    
+    Each reading includes:
+    - Current meter reading
+    - Previous meter reading
+    - Reading date
+    - Meter reader ID
+  </Step>
+
+  <Step title="Consumption Calculation">
+    The system automatically calculates consumption:
+    
+    ```
+    Consumption (m³) = Current Reading - Previous Reading
+    ```
+    
+    <Info>
+    Consumption is measured in cubic meters (m³) of water usage.
+    </Info>
+  </Step>
+
+  <Step title="Rate Application">
+    Appropriate rates are applied based on property type:
+    - **Residential**: Lower rate for household consumption
+    - **Commercial**: Higher rate for business properties
+    
+    The rate is retrieved from the `rates` table based on:
+    - Property type (rate_type)
+    - Current billing month
+  </Step>
+
+  <Step title="Bill Generation">
+    Final bill amount is calculated:
+    
+    ```
+    Billing Amount = Consumption × Rate
+    Total Due = Billing Amount + Tax + Penalty (if applicable)
+    ```
+  </Step>
+</Steps>
+
+## Billing Data Structure
+
+Each billing record contains comprehensive information:
+
+<CodeGroup>
+```sql billing_data table
+CREATE TABLE `billing_data` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `billing_id` varchar(50) NOT NULL,
+  `client_id` varchar(20) NOT NULL,
+  `meter_number` varchar(50) NOT NULL,
+  `prev_reading` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `curr_reading` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `reading_type` varchar(20) DEFAULT NULL,
+  `consumption` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `rates` decimal(7,2) NOT NULL DEFAULT 0.00,
+  `rate_type` enum('Commercial','Residential') NOT NULL,
+  `rate_fee_id` varchar(50) NOT NULL,
+  `billing_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `billing_status` enum('initial','unpaid','paid') DEFAULT 'initial',
+  `billing_type` enum('initial','unverified','verified','billed','paid','disputed','canceled','overdue') NOT NULL DEFAULT 'initial',
+  `penalty` decimal(7,2) NOT NULL DEFAULT 0.00,
+  `billing_month` varchar(20) NOT NULL,
+  `due_date` date DEFAULT NULL,
+  `disconnection_date` date DEFAULT NULL,
+  `period_to` date DEFAULT NULL,
+  `period_from` date DEFAULT NULL,
+  PRIMARY KEY (`id`)
+);
+```
+</CodeGroup>
+
+## Rate Types and Calculation
+
+### Rate Management
+
+Rates are configured in the system and can vary by:
+- Property type (Commercial vs Residential)
+- Billing month/period
+- Tax percentage (fixed at 2%)
+
+<Tabs>
+  <Tab title="Residential Rates">
+    Residential properties receive preferential rates for household water consumption.
+    
+    **Typical Structure:**
+    - Base rate per cubic meter
+    - Progressive pricing may apply for high usage
+    - Fixed 2% tax
+  </Tab>
+  
+  <Tab title="Commercial Rates">
+    Commercial properties are charged higher rates due to business usage.
+    
+    **Typical Structure:**
+    - Higher base rate per cubic meter
+    - Flat rate regardless of consumption volume
+    - Fixed 2% tax
+  </Tab>
+</Tabs>
+
+<CodeGroup>
+```sql rates table
+CREATE TABLE `rates` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `rate_fee_id` varchar(50) NOT NULL,
+  `rate_type` varchar(50) NOT NULL,
+  `rates` varchar(20) NOT NULL,
+  `tax` smallint(6) NOT NULL DEFAULT 2,
+  `billing_month` varchar(20) NOT NULL,
+  `reference_id` varchar(20) NOT NULL,
+  `time` time NOT NULL,
+  `date` date NOT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+);
+```
+</CodeGroup>
+
+### Updating Rates
+
+Administrators can update billing rates through the admin interface:
+
+<CodeGroup>
+```php admin/database_actions.php
+case 'updateRates':
+  handleUpdateRates($dbQueries);
+  break;
+
+function handleUpdateRates($dbQueries) {
+  if (isset($_POST['formData'])) {
+    $formData = $_POST['formData'];
+    $updateResponse = $dbQueries->updateRates($formData);
+    echo json_encode($updateResponse);
+  }
+}
+```
+</CodeGroup>
+
+<Warning>
+Rate changes typically apply to future billing cycles only. Existing unpaid bills retain their original rates unless manually adjusted.
+</Warning>
+
+## Penalties and Due Dates
+
+### Due Date Calculation
+
+Each bill has:
+- **Billing Date**: When the bill is generated
+- **Due Date**: Payment deadline (typically 15-30 days after billing)
+- **Disconnection Date**: Service suspension date if unpaid (typically 15 days after due date)
+
+<CodeGroup>
+```sql billing_data fields
+`due_date` date DEFAULT NULL,
+`disconnection_date` date DEFAULT NULL,
+`period_to` date DEFAULT NULL,
+`period_from` date DEFAULT NULL,
+```
+</CodeGroup>
+
+### Penalty Application
+
+Penalties are automatically applied to overdue bills:
+
+<Steps>
+  <Step title="Check Due Date">
+    System checks if current date exceeds the due date
+  </Step>
+  
+  <Step title="Calculate Penalty">
+    Penalty is calculated based on:
+    - Days overdue
+    - Penalty rate configured in `penalty_fees` table
+    - Original billing amount
+  </Step>
+  
+  <Step title="Update Bill">
+    The penalty amount is added to the total due:
+    ```
+    Total Amount Due = Billing Amount + Tax + Penalty
+    ```
+  </Step>
+</Steps>
+
+<CodeGroup>
+```php admin/database_actions.php
+case 'updatePenaltyFees':
+  handleUpdatePenaltyFees($dbQueries);
+  break;
+```
+</CodeGroup>
+
+## Billing Status Workflow
+
+Billing records progress through various statuses:
+
+<CardGroup cols={2}>
+  <Card title="initial" icon="hourglass-start">
+    Newly created billing record before meter reading
+  </Card>
+  
+  <Card title="unverified" icon="question">
+    Meter reading entered but not yet verified
+  </Card>
+  
+  <Card title="verified" icon="check">
+    Reading verified, ready for billing
+  </Card>
+  
+  <Card title="billed" icon="file-invoice">
+    Bill generated and sent to client
+  </Card>
+  
+  <Card title="paid" icon="circle-check">
+    Payment received and confirmed
+  </Card>
+  
+  <Card title="overdue" icon="triangle-exclamation">
+    Payment past due date
+  </Card>
+  
+  <Card title="disputed" icon="flag">
+    Client has disputed the bill
+  </Card>
+  
+  <Card title="canceled" icon="ban">
+    Bill canceled (e.g., incorrect reading)
+  </Card>
+</CardGroup>
+
+## Viewing Billing Data
+
+The billing interface provides comprehensive viewing options:
+
+<Tabs>
+  <Tab title="All Billing Records">
+    View all billing records with:
+    - Client information
+    - Meter readings (previous and current)
+    - Consumption amount
+    - Rate applied
+    - Total amount due
+    - Payment status
+    - Due date
+    
+    <CodeGroup>
+    ```php admin/components/billing_main.php
+    <div id="displayBillingTable"></div>
+    ```
+    </CodeGroup>
+  </Tab>
+  
+  <Tab title="Client-Specific Billing">
+    View billing history for a specific client:
+    - All past billing cycles
+    - Payment history
+    - Consumption trends
+    - Outstanding balance
+    
+    Access via client profile page at `admin/client_billing.php`
+  </Tab>
+  
+  <Tab title="Filter and Search">
+    Filter billing records by:
+    - Billing status (paid/unpaid/overdue)
+    - Date range
+    - Client ID or meter number
+    - Property type
+    - Barangay
+  </Tab>
+</Tabs>
+
+## Billing Reports
+
+The system generates various billing reports for analysis:
+
+<CardGroup cols={2}>
+  <Card title="Monthly Revenue" icon="chart-line">
+    Total revenue collected per billing month
+  </Card>
+  
+  <Card title="Outstanding Balance" icon="money-bill">
+    Total unpaid bills and overdue amounts
+  </Card>
+  
+  <Card title="Consumption Analysis" icon="chart-bar">
+    Water consumption trends by:
+    - Property type
+    - Barangay
+    - Time period
+  </Card>
+  
+  <Card title="Payment Collection" icon="wallet">
+    Payment collection rates and efficiency metrics
+  </Card>
+</CardGroup>
+
+<Info>
+Consumption data is aggregated in the dashboard analytics. See [Reports & Analytics](/features/reports-analytics) for details.
+</Info>
+
+## API Actions
+
+The billing system exposes several API endpoints:
+
+<CodeGroup>
+```php admin/database_actions.php
+case 'setInitialBillingData':
+  // Create initial billing record for new client
+  handleSetInitialBillingData($dbQueries);
+  break;
+
+case 'updateRates':
+  // Update billing rates
+  handleUpdateRates($dbQueries);
+  break;
+
+case 'updatePenaltyFees':
+  // Update penalty fee structure
+  handleUpdatePenaltyFees($dbQueries);
+  break;
+```
+</CodeGroup>
+
+## Integration with Other Modules
+
+<Steps>
+  <Step title="Client Management">
+    New approved clients automatically get initial billing records created
+  </Step>
+  
+  <Step title="Meter Reading">
+    Meter readings update billing records with current consumption
+  </Step>
+  
+  <Step title="Payment Processing">
+    Cashiers confirm payments and update billing status to 'paid'
+  </Step>
+  
+  <Step title="Email Notifications">
+    Bills are automatically emailed to clients when generated
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Meter Reading" icon="gauge" href="/features/meter-reading">
+    Learn how meter readings are collected and encoded
+  </Card>
+  
+  <Card title="Payment Processing" icon="cash-register" href="/features/payment-processing">
+    Understand how payments are confirmed and processed
+  </Card>
+</CardGroup>

@@ -1,0 +1,262 @@
+---
+title: File structure
+description: Understanding the directory organization and file naming conventions
+---
+
+The Roxas Water Billing System follows a modular structure with separate directories for each user role and shared resources.
+
+## Root directory structure
+
+```
+roxas_wbs/
+├── admin/                 # Administrator portal
+├── cashier/               # Cashier portal
+├── meter-reader/          # Meter reader portal
+├── authentication/        # Sign in/sign up pages
+├── assets/                # Shared static files
+├── uploads/               # User-uploaded files
+├── DB_BACKUP/             # Database schema backups
+├── node_modules/          # NPM dependencies
+├── src/                   # Tailwind CSS source
+├── index.php              # Landing page
+├── package.json           # NPM configuration
+├── tailwind.config.js     # Tailwind configuration
+└── composer.json          # PHP dependencies (deprecated)
+```
+
+<Info>
+Each portal (admin, cashier, meter-reader) has its own Composer dependencies defined in its respective directory, not at the root level.
+</Info>
+
+## Portal directory structure
+
+All three portals follow the same organizational pattern:
+
+### Admin portal
+
+```
+admin/
+├── assets/
+│   ├── css/              # Compiled Tailwind CSS
+│   ├── js/               # JavaScript modules
+│   │   ├── AddressFetcher.js
+│   │   ├── DataTableWithPagination.js
+│   │   ├── clientActions.js
+│   │   ├── chartsData.js
+│   │   └── ...
+│   └── libs/             # Third-party libraries
+│       └── apexcharts/
+├── components/
+│   ├── dashboard_main.php
+│   ├── clients_main.php
+│   ├── billing_main.php
+│   └── ...
+├── layouts/
+│   ├── header.php
+│   ├── sidebar.php
+│   ├── links.php         # CSS includes
+│   └── scripts.php       # JS includes
+├── templates/
+│   ├── reg-template.html           # Registration certificate
+│   ├── approval-email-template.html
+│   └── disconnection_notice.html
+├── database/
+│   ├── Database.php      # DatabaseConnection class
+│   ├── connection.php    # Database initialization
+│   ├── config.php        # DB credentials
+│   └── config.json       # JSON credentials
+├── temp/                 # Temporary PDF storage
+│   ├── registration/
+│   └── ...
+├── vendor/               # Composer dependencies
+├── composer.json         # PHP dependencies
+├── auth_guard.php        # Role-based access control
+├── database_queries.php  # Query classes
+├── database_actions.php  # CRUD operations
+└── *.php                 # Page files
+```
+
+### Cashier portal
+
+```
+cashier/
+├── assets/               # Same structure as admin
+├── components/
+│   ├── application_payments_main.php
+│   ├── billing_payments_main.php
+│   └── ...
+├── layouts/              # Same structure as admin
+├── templates/
+│   ├── invoice-billing.html
+│   └── transaction-table.html
+├── database/             # Same structure as admin
+├── temp/                 # Temporary files
+├── vendor/
+├── composer.json
+├── auth_guard.php
+├── database_queries.php
+├── database_actions.php
+└── *.php
+```
+
+### Meter reader portal
+
+```
+meter-reader/
+├── assets/               # Same structure as admin
+├── components/
+│   ├── encode_meter_reading_main.php
+│   ├── verify_meter_reading_main.php
+│   └── ...
+├── layouts/              # Same structure as admin
+├── templates/
+│   ├── billing-template.html
+│   └── transaction-table.html
+├── database/             # Same structure as admin
+├── temp/                 # Temporary files
+├── vendor/
+├── composer.json
+├── auth_guard.php
+├── database_queries.php
+├── database_actions.php
+└── *.php
+```
+
+## Authentication directory
+
+```
+authentication/
+├── assets/
+│   ├── css/
+│   ├── js/
+│   └── images/
+├── components/
+│   ├── signin_main.php
+│   └── signup_main.php
+├── database/
+│   ├── connection.php
+│   └── config.php
+├── signin.php
+├── signin_process.php
+└── signup.php
+```
+
+## File naming conventions
+
+### Page files
+
+Top-level PHP files represent pages:
+- `dashboard.php` - Portal dashboard
+- `clients.php` - Client management
+- `billing.php` - Billing management
+- `transactions.php` - Transaction history
+
+### Component files
+
+Component files contain the main content and end with `_main.php`:
+- `dashboard_main.php` - Dashboard content
+- `clients_main.php` - Client list content
+- `billing_main.php` - Billing form content
+
+<Note>
+Page files include `auth_guard.php`, layouts, and their corresponding `_main.php` component. This separates authentication and UI structure from content.
+</Note>
+
+### Layout files
+
+Layout files provide consistent structure:
+- `header.php` - Top navigation bar
+- `sidebar.php` - Side navigation menu
+- `links.php` - CSS stylesheet includes
+- `scripts.php` - JavaScript includes
+- `*_nav.php` - Sub-navigation for specific sections
+
+### JavaScript modules
+
+JavaScript files follow camelCase naming:
+- `AddressFetcher.js` - Address selection handler
+- `DataTableWithPagination.js` - Table component
+- `clientActions.js` - Client CRUD operations
+- `chartsData.js` - Dashboard chart data fetching
+
+### Template files
+
+HTML templates for PDF and email:
+- `reg-template.html` - Registration certificate
+- `invoice-billing.html` - Payment invoice
+- `approval-email-template.html` - Approval notification
+- `billing-template.html` - Monthly billing statement
+
+## Shared vs portal-specific files
+
+### Shared resources
+
+- **Tailwind CSS configuration** - `tailwind.config.js` compiles CSS for all portals
+- **Node modules** - Shared JavaScript dependencies (Flowbite, ApexCharts, jQuery)
+- **Database backups** - `DB_BACKUP/` contains schema SQL files
+- **Uploads** - `uploads/` stores user-uploaded files
+
+### Portal-specific resources
+
+- **Composer dependencies** - Each portal has its own `vendor/` directory
+- **Database queries** - Each portal has its own query classes
+- **Templates** - PDF/email templates are portal-specific
+- **JavaScript modules** - Custom JS is duplicated across portals
+
+<Warning>
+While some code is duplicated across portals, this design allows each portal to be deployed independently and maintains clear separation of concerns.
+</Warning>
+
+## Temp directories
+
+Each portal creates temporary files:
+
+```
+temp/
+├── registration/         # Registration certificates
+├── billing/              # Billing statements
+├── invoice/              # Payment invoices
+└── reports/              # Generated reports
+```
+
+<Info>
+Temporary files are generated on-demand and can be safely deleted. They are recreated when needed.
+</Info>
+
+## Database configuration
+
+Database credentials are stored in multiple formats:
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "host": "localhost",
+      "username": "root",
+      "password": "",
+      "database": "wbs_db"
+    }
+    ```
+  </Tab>
+  <Tab title="config.php">
+    ```php
+    <?php
+    $config = json_decode(file_get_contents('config.json'), true);
+    $host1 = $config['host'];
+    $username1 = $config['username'];
+    $password1 = $config['password'];
+    $database1 = $config['database'];
+    ```
+  </Tab>
+</Tabs>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/development/architecture">
+    Understand the system design
+  </Card>
+  <Card title="Frontend" icon="paintbrush" href="/development/frontend">
+    Learn about UI components
+  </Card>
+</CardGroup>

@@ -1,0 +1,290 @@
+---
+title: Client Management
+description: Managing client applications, approvals, and profiles in the Roxas Water Billing System
+---
+
+The client management system handles the complete lifecycle of water service clients, from initial application through approval to ongoing profile management.
+
+## Client Application Workflow
+
+New clients must submit an application through a structured approval process before receiving water service.
+
+<Steps>
+  <Step title="Submit Application">
+    Clients fill out a comprehensive application form with personal information, property details, and required documents.
+    
+    **Required Information:**
+    - Meter Number (format: W-XXXXX)
+    - Property Type (Residential or Commercial)
+    - Full Name (First, Middle, Last, Suffix)
+    - Birthdate and Age (minimum 18 years old)
+    - Gender
+    - Contact Number and Email
+    - Complete Address (Region, Province, Municipality, Barangay, Street)
+    
+    **Required Documents:**
+    - Valid ID
+    - Proof of Ownership (photocopy of Original Certificate of Title)
+    - Deed of Sale (if title not yet transferred)
+    - Affidavit of undertaking (when applicable)
+
+    <CodeGroup>
+    ```php admin/components/client_application_form_main.php
+    <form id="application_form">
+      <input type="text" name="meterNumber" placeholder="W-">
+      <select name="propertyType">
+        <option value="Residential">Residential</option>
+        <option value="Commercial">Commercial</option>
+      </select>
+      <input type="text" name="firstName">
+      <input type="text" name="lastName">
+      <!-- Additional fields... -->
+      <input type="checkbox" name="validId">
+      <input type="checkbox" name="proofOfOwnership">
+    </form>
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Application Review">
+    Admin staff reviews submitted applications through the Client Application Review interface.
+    
+    The application displays:
+    - Full client information for verification
+    - Status badges (confirmed/unconfirmed/approved)
+    - Document checklist verification
+    - Editable fields for corrections if needed
+
+    <CodeGroup>
+    ```javascript admin/assets/js/clientApplicationProcessing.js
+    function retrieveClientApplicationData(applicationID, callback) {
+      $.ajax({
+        url: "database_actions.php",
+        type: "POST",
+        data: {
+          action: "getClientApplicationData",
+          applicationID: applicationID,
+        },
+        success: function (data) {
+          var applicationData = JSON.parse(data).applicationData;
+          callback(applicationData);
+        }
+      });
+    }
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Approve or Decline">
+    Applications can be:
+    - **Approved** - Client becomes active in the system
+    - **Confirmed** - Payment confirmed, awaiting final approval
+    - **Declined** - Application rejected with reason
+
+    <CodeGroup>
+    ```php admin/database_actions.php
+    function handleApproveClientApplication($dbQueries) {
+      if (isset($_POST['formData'])) {
+        $formData = $_POST['formData'];
+        $processResponse = $dbQueries->approveClientApplication($formData);
+        echo json_encode($processResponse);
+      }
+    }
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Initial Billing Setup">
+    Once approved, initial billing data is created for the new client with:
+    - Client ID assignment
+    - Meter number linkage
+    - Property type classification (for rate determination)
+    - Initial billing status
+
+    <CodeGroup>
+    ```php admin/database_actions.php
+    case 'setInitialBillingData':
+      handleSetInitialBillingData($dbQueries);
+      break;
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Client Search and Filtering
+
+The system provides powerful search and filter capabilities for managing large client databases.
+
+<Tabs>
+  <Tab title="Search">
+    Search clients by:
+    - Client ID
+    - Meter Number
+    - Name (First, Middle, Last)
+    - Email
+    - Phone Number
+  </Tab>
+  
+  <Tab title="Filter">
+    Filter clients by:
+    - **Status**: Active, Inactive, Under Review
+    - **Property Type**: Residential, Commercial
+    - **Barangay**: Location-based filtering
+    - **Billing Status**: Initial, Unpaid, Paid
+  </Tab>
+  
+  <Tab title="Pagination">
+    Results are paginated with configurable items per page:
+    - Default: 10 items per page
+    - Options: 10, 25, 50, 100
+    - Server-side pagination for performance
+  </Tab>
+</Tabs>
+
+## Client Profile Management
+
+Admins can view and update client profiles with detailed information tracking.
+
+### Profile Information
+
+<CardGroup cols={2}>
+  <Card title="Personal Details" icon="user">
+    - Full name and suffix
+    - Birthdate and age
+    - Gender
+    - Contact information
+  </Card>
+  
+  <Card title="Service Details" icon="droplet">
+    - Client ID
+    - Meter number
+    - Property type
+    - Service address
+  </Card>
+  
+  <Card title="Billing Information" icon="receipt">
+    - Current billing status
+    - Payment history
+    - Outstanding balance
+    - Rate type
+  </Card>
+  
+  <Card title="Documents" icon="file-check">
+    - Valid ID status
+    - Proof of ownership
+    - Deed of sale
+    - Affidavit (if applicable)
+  </Card>
+</CardGroup>
+
+### Update Client Profile
+
+Client information can be updated by admin staff:
+
+<CodeGroup>
+```php admin/database_actions.php
+case 'updateClientProfile':
+  handleUpdateClientProfile($dbQueries);
+  break;
+
+function handleUpdateClientProfile($dbQueries) {
+  if (isset($_POST['formData'])) {
+    $formData = $_POST['formData'];
+    $updateResponse = $dbQueries->updateClientProfile($formData);
+    echo json_encode($updateResponse);
+  }
+}
+```
+</CodeGroup>
+
+<Info>
+All client data changes are sanitized using `htmlspecialchars()` to prevent XSS attacks and maintain data integrity.
+</Info>
+
+## Client Status Management
+
+Clients can have the following statuses:
+
+| Status | Description | Billing Allowed |
+|--------|-------------|----------------|
+| **Active** | Client has approved service | Yes |
+| **Inactive** | Service temporarily suspended | No |
+| **Under Review** | Application pending approval | No |
+
+<Warning>
+Changing a client from Active to Inactive will prevent new billing cycles from being created for that client.
+</Warning>
+
+## Data Tables
+
+Client data is displayed in interactive tables with:
+
+- **Sorting**: Click column headers to sort
+- **Search**: Real-time search across all fields
+- **Filtering**: Multi-criteria filtering
+- **Pagination**: Server-side pagination
+- **Export**: Export to CSV/PDF (if configured)
+
+<CodeGroup>
+```php admin/database_actions.php
+function handleGetDataTable($dataTable) {
+  if (isset($_POST['dataTableParam']) && isset($_POST['tableName'])) {
+    $dataTableParam = $_POST['dataTableParam'];
+    $tableName = $_POST['tableName'];
+    
+    switch ($tableName) {
+      case "client_application":
+        $dataTable->clientApplicationTable($dataTableParam);
+        break;
+      case "client_data":
+        $dataTable->clientTable($dataTableParam);
+        break;
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Database Schema
+
+The client application system uses the following database structure:
+
+<CodeGroup>
+```sql client_application table
+CREATE TABLE `client_application` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `meter_number` varchar(20) NOT NULL,
+  `first_name` varchar(50) NOT NULL,
+  `middle_name` varchar(50) NOT NULL,
+  `last_name` varchar(20) NOT NULL,
+  `name_suffix` varchar(20) DEFAULT NULL,
+  `full_name` text NOT NULL,
+  `email` varchar(50) NOT NULL,
+  `phone_number` varchar(20) NOT NULL,
+  `birthdate` varchar(20) NOT NULL,
+  `age` int(11) NOT NULL,
+  `gender` varchar(20) NOT NULL,
+  `property_type` varchar(15) NOT NULL,
+  `street` text NOT NULL,
+  `brgy` varchar(50) NOT NULL,
+  `full_address` text NOT NULL,
+  `valid_id` varchar(10) NOT NULL,
+  `proof_of_ownership` varchar(10) NOT NULL,
+  `deed_of_sale` varchar(10) NOT NULL,
+  `affidavit` varchar(10) NOT NULL,
+  PRIMARY KEY (`id`)
+);
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Billing System" icon="file-invoice-dollar" href="/features/billing-system">
+    Learn how billing cycles are created for approved clients
+  </Card>
+  
+  <Card title="Meter Reading" icon="gauge" href="/features/meter-reading">
+    Understand the meter reading and encoding process
+  </Card>
+</CardGroup>
