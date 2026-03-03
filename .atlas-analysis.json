@@ -1,0 +1,112 @@
+{
+  "projectType": "saas",
+  "projectName": "Roxas Water Billing System",
+  "projectDescription": "A comprehensive water utility billing platform with automated meter reading, payment processing, and multi-role dashboard management.",
+  "theme": "palm",
+  "primaryColor": "#4338ca",
+  "lightColor": "#818cf8",
+  "darkColor": "#312e81",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/client-management",
+              "features/billing-system",
+              "features/meter-reading",
+              "features/payment-processing",
+              "features/reports-analytics"
+            ]
+          },
+          {
+            "group": "User Roles",
+            "pages": [
+              "roles/admin",
+              "roles/cashier",
+              "roles/meter-reader"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/database",
+              "configuration/environment",
+              "configuration/php-setup"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Database Reference",
+        "groups": [
+          {
+            "group": "Database Schema",
+            "pages": [
+              "database/overview",
+              "database/client-tables",
+              "database/billing-tables",
+              "database/transaction-tables"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Guide",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "development/architecture",
+              "development/file-structure",
+              "development/frontend"
+            ]
+          },
+          {
+            "group": "API & Integration",
+            "pages": [
+              "development/database-queries",
+              "development/pdf-generation",
+              "development/email-integration"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-role access system (Admin, Cashier, Meter Reader)",
+    "Automated billing calculations based on water consumption",
+    "Client application workflow with approval system",
+    "Real-time dashboard analytics and charts",
+    "PDF invoice and certificate generation",
+    "Payment processing and transaction history",
+    "Meter reading verification and billing generation",
+    "Search, filter, and pagination for all data tables",
+    "Email notifications for approvals and billing"
+  ],
+  "publicApiSurface": [
+    "Admin Portal - /admin/dashboard.php",
+    "Cashier Portal - /cashier/dashboard.php",
+    "Meter Reader Portal - /meter-reader/dashboard.php",
+    "Authentication - /authentication/signin.php",
+    "Client Management - /admin/clients.php",
+    "Billing Management - /admin/billing.php",
+    "Payment Processing - /cashier/billing_payments.php",
+    "Meter Reading Encoding - /meter-reader/encode_meter_reading.php",
+    "Reports Generation - /admin/reports.php",
+    "PDF Generation - /admin/generate_pdf.php",
+    "Client Applications - /admin/clients_application_table.php",
+    "Transaction History - /admin/transactions.php"
+  ]
+}
